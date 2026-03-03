@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import { PHASE_CONFIG, MOTIVATION, XP_VALUES, START_WEIGHT, START_DATE } from '../data/config';
 import { getMealsForDay } from '../data/meals';
@@ -48,6 +49,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
   const [editingMeal, setEditingMeal] = useState(null);
   const [showAddSnack, setShowAddSnack] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
 
   const viewDate = useMemo(() => {
     const d = new Date();
@@ -410,7 +412,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
                     </div>
                   )}
                   {display.photo && (
-                    <img src={display.photo} alt="" className="w-full h-24 object-cover rounded-lg mb-1.5" />
+                    <img src={display.photo} alt="" className="w-full h-24 object-cover rounded-lg mb-1.5 active:opacity-70" onClick={() => setLightboxPhoto(display.photo)} />
                   )}
                   <div className="flex gap-2">
                     <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{display.cal} cal</span>
@@ -431,7 +433,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-sm">{extra.name}</span>
                 {extra.photo && (
-                  <img src={extra.photo} alt="" className="w-full h-24 object-cover rounded-lg mt-1.5" />
+                  <img src={extra.photo} alt="" className="w-full h-24 object-cover rounded-lg mt-1.5 active:opacity-70" onClick={() => setLightboxPhoto(extra.photo)} />
                 )}
                 <div className="flex gap-2 mt-1">
                   <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{extra.cal} cal</span>
@@ -491,6 +493,12 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
           }}
           onClose={() => setShowAddSnack(false)}
         />
+      )}
+      {lightboxPhoto && createPortal(
+        <div className="fixed inset-0 z-[110] bg-black/90 flex items-center justify-center p-4" onClick={() => setLightboxPhoto(null)}>
+          <img src={lightboxPhoto} alt="" className="max-w-full max-h-full object-contain rounded-xl" />
+        </div>,
+        document.body,
       )}
     </div>
   );
