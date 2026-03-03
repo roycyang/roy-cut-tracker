@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 256,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userContent }],
@@ -61,6 +61,9 @@ export default async function handler(req, res) {
     return res.status(200).json(result);
   } catch (err) {
     console.error('Meal analysis error:', err);
-    return res.status(500).json({ error: 'Failed to analyze meal' });
+    const detail = err?.status
+      ? `Anthropic API ${err.status}: ${err.message}`
+      : err?.message || 'Unknown error';
+    return res.status(500).json({ error: detail });
   }
 }
