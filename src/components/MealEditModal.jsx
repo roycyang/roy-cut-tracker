@@ -71,11 +71,14 @@ export default function MealEditModal({ meal, onSave, onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Analysis failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Server error (${res.status})`);
+      }
       const data = await res.json();
       setResult(data);
-    } catch {
-      setError('Could not analyze meal. Try again.');
+    } catch (err) {
+      setError(err.message || 'Could not analyze meal. Try again.');
     } finally {
       setLoading(false);
     }
