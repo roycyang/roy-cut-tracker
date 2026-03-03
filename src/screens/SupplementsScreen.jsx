@@ -1,13 +1,12 @@
 import { useState, useCallback } from 'react';
-import { SUPPLEMENTS, XP_VALUES } from '../data/config';
+import { XP_VALUES } from '../data/config';
 import { toDateKey, getCurrentPhase, getCurrentWeek } from '../utils/dateUtils';
 import {
-  getSuppChecks, setSuppCheck, addXP, getPhaseOverride,
-  getBarrysCount, setBarrysAttended, getBarrysAttendance,
+  addXP, getPhaseOverride, getBarrysCount, setBarrysAttended, getBarrysAttendance,
+  getStreaks,
 } from '../utils/storage';
-import { recalculateStreaks } from '../utils/streaks';
-import { checkBadges, checkFullSend } from '../utils/badges';
-import { playSuppCheck, playAllSuppsDone } from '../utils/sounds';
+import { getStreakClass } from '../utils/streaks';
+import { checkBadges } from '../utils/badges';
 
 export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
   const today = new Date();
@@ -16,97 +15,61 @@ export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
   const week = getCurrentWeek(today);
   const isBarrysDay = phase >= 2 && today.getDay() === 3;
 
-  const [suppChecks, setSuppChecksState] = useState(getSuppChecks(dateKey));
   const [barrysAttendance] = useState(getBarrysAttendance());
   const barrysCount = getBarrysCount();
   const barrysDoneToday = !!barrysAttendance[dateKey];
-
-  const handleSuppCheck = useCallback((suppId, checked) => {
-    setSuppCheck(dateKey, suppId, checked);
-    const updated = { ...suppChecks, [suppId]: checked };
-    setSuppChecksState(updated);
-
-    if (checked) {
-      addXP(XP_VALUES.checkSupplement);
-      const allDone = SUPPLEMENTS.every(s => updated[s.id]);
-      if (allDone) {
-        addXP(XP_VALUES.allSupplements);
-        playAllSuppsDone();
-        onToast('All supplements taken! 💊 +20 XP bonus');
-        recalculateStreaks();
-
-        // Check Full Send
-        if (isBarrysDay && barrysDoneToday) {
-          if (checkFullSend(dateKey)) {
-            onBadgeUnlock('full_send');
-          }
-        }
-      } else {
-        playSuppCheck();
-      }
-    }
-
-    const newBadges = checkBadges();
-    if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-    recalculateStreaks();
-  }, [dateKey, suppChecks, onToast, onBadgeUnlock, isBarrysDay, barrysDoneToday]);
+  const streaks = getStreaks();
 
   const handleBarrysCheck = useCallback(() => {
     setBarrysAttended(dateKey);
     addXP(XP_VALUES.barrysSession);
     onToast("Barry's session completed! 🥊 +50 XP");
-
-    // Check Full Send
-    const suppsAllDone = SUPPLEMENTS.every(s => suppChecks[s.id]);
-    if (suppsAllDone) {
-      if (checkFullSend(dateKey)) {
-        onBadgeUnlock('full_send');
-      }
-    }
-
     const newBadges = checkBadges();
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-  }, [dateKey, suppChecks, onToast, onBadgeUnlock]);
+  }, [dateKey, onToast, onBadgeUnlock]);
 
   return (
     <div className="pb-4 animate-fade-in">
-      <h2 className="text-lg font-bold mb-4">Supplements</h2>
+      <h2 className="text-lg font-bold mb-4">Supplements & Streaks</h2>
 
-      {/* Phase 3 banner */}
-      {phase >= 3 && (
-        <div className="bg-purple-900/30 border border-purple-700/50 rounded-xl px-4 py-3 mb-4 text-sm">
-          ⬆️ 2 scoops Whey today
-        </div>
-      )}
-
-      {/* Supplement checklist */}
-      <div className="space-y-2 mb-6">
-        {SUPPLEMENTS.map(supp => (
-          <div
-            key={supp.id}
-            className={`bg-[#1a1a1a] rounded-xl p-4 flex items-center gap-3 transition-all ${
-              suppChecks[supp.id] ? 'border border-green-800/40' : 'border border-transparent'
-            }`}
-          >
-            <button
-              onClick={() => handleSuppCheck(supp.id, !suppChecks[supp.id])}
-              className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                suppChecks[supp.id]
-                  ? 'bg-green-600 border-green-600 text-white'
-                  : 'border-gray-600 text-transparent'
-              }`}
-            >
-              ✓
-            </button>
-            <div className="flex-1">
-              <span className="font-medium text-sm">{supp.name}</span>
-              {supp.time && <span className="text-xs text-gray-500 ml-2">({supp.time})</span>}
-              {supp.id === 'whey' && phase >= 3 && (
-                <span className="text-xs text-purple-400 ml-2">⬆️ 2 scoops</span>
-              )}
-            </div>
+      {/* Daily stack info */}
+      <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3">
+        <h3 className="font-semibold text-sm mb-3">Daily Stack</h3>
+        <div className="space-y-2 text-sm text-gray-400">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">7:30am</span>
+            <span>Pre-Workout + Creatine (5g)</span>
           </div>
-        ))}
+          <div className="flex items-center gap-2">
+            <span className="text-gray-600">9:00am</span>
+            <span>Whey Isolate {phase >= 3 ? '(2 scoops)' : '(1 scoop)'} + Collagen Peptides</span>
+          </div>
+        </div>
+        {phase >= 3 && (
+          <div className="mt-3 pt-3 border-t border-[#2a2a2a] text-sm text-purple-400">
+            ⬆️ Phase 3: 2 scoops Whey per shake
+          </div>
+        )}
+      </div>
+
+      {/* Streaks */}
+      <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3">
+        <h3 className="font-semibold text-sm mb-3">Streaks</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Logging', emoji: '🔥', count: streaks.logging },
+            { label: 'Meals', emoji: '🍽️', count: streaks.meals },
+            { label: 'Supps', emoji: '💊', count: streaks.supplements },
+          ].map(s => (
+            <div
+              key={s.label}
+              className={`bg-[#111] rounded-xl p-3 text-center ${getStreakClass(s.count)}`}
+            >
+              <div className="text-2xl font-bold">{s.count}</div>
+              <div className="text-xs text-gray-400">{s.emoji} {s.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Barry's section (Weeks 7-10) */}

@@ -2,7 +2,7 @@
 const PHASE1_MEAL1 = {
   time: '9:00am',
   name: 'Post-Workout Shake',
-  ingredients: '1 scoop Whey Isolate + Collagen Peptides + 8oz almond milk + 5g Creatine',
+  ingredients: '1 scoop Whey Isolate + Collagen Peptides + 8oz almond milk',
   cal: 210, protein: 39, carbs: 2, fat: 2,
 };
 
@@ -58,7 +58,7 @@ const PHASE1_MEAL3 = {
 const PHASE3_MEAL1 = {
   time: '9:00am',
   name: 'Post-Workout Shake (UPGRADED)',
-  ingredients: '2 scoops Whey Isolate + Collagen Peptides + 8oz almond milk + 5g Creatine',
+  ingredients: '2 scoops Whey Isolate + Collagen Peptides + 8oz almond milk',
   cal: 330, protein: 63, carbs: 3, fat: 3,
 };
 
