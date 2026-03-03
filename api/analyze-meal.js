@@ -55,7 +55,8 @@ export default async function handler(req, res) {
       ],
     });
 
-    const raw = completion.choices[0].message.content.trim();
+    const raw = completion.choices[0].message.content.trim()
+      .replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
     const result = JSON.parse(raw);
 
     return res.status(200).json(result);
