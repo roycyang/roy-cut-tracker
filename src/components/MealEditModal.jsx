@@ -27,14 +27,34 @@ function resizeImage(file, maxSize = 1024) {
   });
 }
 
+function makeThumbnail(base64, maxSize = 200) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const ratio = Math.min(maxSize / width, maxSize / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = `data:image/jpeg;base64,${base64}`;
+  });
+}
+
 export default function MealEditModal({ meal, onSave, onClose }) {
   const [tab, setTab] = useState('text');
   const [text, setText] = useState('');
+  const [hint, setHint] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
   const [imageData, setImageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [revision, setRevision] = useState('');
   const fileInputRef = useRef(null);
 
   const handleImageSelect = async (e) => {
@@ -63,6 +83,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
       if (!imageData) { setLoading(false); return; }
       body.imageBase64 = imageData.base64;
       body.imageMimeType = imageData.mimeType;
+      if (hint.trim()) body.hint = hint.trim();
     }
 
     try {
@@ -77,6 +98,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
       }
       const data = await res.json();
       setResult(data);
+      setRevision('');
     } catch (err) {
       setError(err.message || 'Could not analyze meal. Try again.');
     } finally {
@@ -84,9 +106,39 @@ export default function MealEditModal({ meal, onSave, onClose }) {
     }
   };
 
-  const handleSave = () => {
+  const handleRevise = async () => {
+    if (!revision.trim() || !result) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/analyze-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'revision',
+          previousResult: result,
+          revision: revision.trim(),
+          plannedMeal: `${meal.name} — ${meal.ingredients}`,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Server error (${res.status})`);
+      }
+      const data = await res.json();
+      setResult(data);
+      setRevision('');
+    } catch (err) {
+      setError(err.message || 'Could not revise. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
     if (!result) return;
-    onSave({
+    const entry = {
       name: result.name,
       ingredients: result.ingredients,
       cal: result.cal,
@@ -94,7 +146,11 @@ export default function MealEditModal({ meal, onSave, onClose }) {
       carbs: result.carbs,
       fat: result.fat,
       source: tab,
-    });
+    };
+    if (imageData) {
+      entry.photo = await makeThumbnail(imageData.base64);
+    }
+    onSave(entry);
   };
 
   const canAnalyze = tab === 'text' ? text.trim().length > 0 : !!imageData;
@@ -126,7 +182,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setResult(null); setError(null); }}
+              onClick={() => { setTab(t.id); setResult(null); setError(null); setRevision(''); }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 tab === t.id ? 'bg-[#2a2a2a] text-white' : 'text-gray-500'
               }`}
@@ -149,34 +205,43 @@ export default function MealEditModal({ meal, onSave, onClose }) {
                 className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none mb-3"
               />
             ) : (
-              <div className="mb-3">
-                {imagePreview ? (
-                  <div className="relative">
-                    <img src={imagePreview} alt="Meal" className="w-full h-48 object-cover rounded-xl" />
+              <>
+                <div className="mb-3">
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img src={imagePreview} alt="Meal" className="w-full h-48 object-cover rounded-xl" />
+                      <button
+                        onClick={() => { setImagePreview(null); setImageData(null); }}
+                        className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white text-sm"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => { setImagePreview(null); setImageData(null); }}
-                      className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white text-sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-full h-36 border-2 border-dashed border-[#333] rounded-xl flex flex-col items-center justify-center text-gray-500 active:border-blue-500"
                     >
-                      &times;
+                      <span className="text-3xl mb-1">📷</span>
+                      <span className="text-sm">Tap to take or choose a photo</span>
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-36 border-2 border-dashed border-[#333] rounded-xl flex flex-col items-center justify-center text-gray-500 active:border-blue-500"
-                  >
-                    <span className="text-3xl mb-1">📷</span>
-                    <span className="text-sm">Tap to take or choose a photo</span>
-                  </button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  className="hidden"
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                  />
+                </div>
+                <textarea
+                  value={hint}
+                  onChange={e => setHint(e.target.value)}
+                  placeholder="Optional: describe what's in the photo (e.g. poke bowl without rice, low carb)"
+                  rows={2}
+                  className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none mb-3"
                 />
-              </div>
+              </>
             )}
 
             {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
@@ -229,9 +294,32 @@ export default function MealEditModal({ meal, onSave, onClose }) {
             </div>
             <p className="text-xs text-gray-500 mb-3">{result.ingredients}</p>
 
+            {/* Revision input */}
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={revision}
+                onChange={e => setRevision(e.target.value)}
+                placeholder="Adjust: e.g. no rice, smaller portion"
+                className="flex-1 bg-[#111] border border-[#333] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500"
+                onKeyDown={e => e.key === 'Enter' && handleRevise()}
+              />
+              <button
+                onClick={handleRevise}
+                disabled={!revision.trim() || loading}
+                className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                  revision.trim() && !loading ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-[#333] text-gray-500'
+                }`}
+              >
+                {loading ? '...' : 'Revise'}
+              </button>
+            </div>
+
+            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+
             <div className="flex gap-3">
               <button
-                onClick={() => { setResult(null); setError(null); }}
+                onClick={() => { setResult(null); setError(null); setRevision(''); }}
                 className="flex-1 py-3 rounded-xl bg-[#333] text-gray-300 font-semibold"
               >
                 Redo

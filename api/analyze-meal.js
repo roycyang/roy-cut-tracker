@@ -19,9 +19,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { type, text, imageBase64, imageMimeType, plannedMeal } = req.body;
+  const { type, text, imageBase64, imageMimeType, plannedMeal, hint, previousResult, revision } = req.body;
 
-  if (!type || (type === 'text' && !text) || (type === 'image' && !imageBase64)) {
+  if (!type ||
+    (type === 'text' && !text) ||
+    (type === 'image' && !imageBase64) ||
+    (type === 'revision' && (!previousResult || !revision))) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -34,10 +37,14 @@ export default async function handler(req, res) {
         url: `data:${imageMimeType || 'image/jpeg'};base64,${imageBase64}`,
       },
     });
-    userContent.push({
-      type: 'text',
-      text: `Analyze this meal photo and estimate macros.${plannedMeal ? `\nPlanned meal for reference: ${plannedMeal}` : ''}`,
-    });
+    let promptText = 'Analyze this meal photo and estimate macros.';
+    if (hint) promptText += `\nUser notes: ${hint}`;
+    if (plannedMeal) promptText += `\nPlanned meal for reference: ${plannedMeal}`;
+    userContent.push({ type: 'text', text: promptText });
+  } else if (type === 'revision') {
+    let promptText = `You previously estimated this meal as:\n${JSON.stringify(previousResult)}\n\nThe user wants this adjustment: "${revision}"\n\nPlease provide a corrected estimate in the same JSON format.`;
+    if (plannedMeal) promptText += `\nPlanned meal for reference: ${plannedMeal}`;
+    userContent.push({ type: 'text', text: promptText });
   } else {
     userContent.push({
       type: 'text',

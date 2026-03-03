@@ -27,6 +27,24 @@ function resizeImage(file, maxSize = 1024) {
   });
 }
 
+function makeThumbnail(base64, maxSize = 200) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const ratio = Math.min(maxSize / width, maxSize / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = `data:image/jpeg;base64,${base64}`;
+  });
+}
+
 export default function AddSnackModal({ onSave, onClose }) {
   const [tab, setTab] = useState('manual');
   const [name, setName] = useState('Snack');
@@ -35,23 +53,30 @@ export default function AddSnackModal({ onSave, onClose }) {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [text, setText] = useState('');
+  const [hint, setHint] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
   const [imageData, setImageData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [aiDone, setAiDone] = useState(false);
   const [error, setError] = useState(null);
+  const [revision, setRevision] = useState('');
+  const [lastResult, setLastResult] = useState(null);
   const fileInputRef = useRef(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const calNum = parseInt(cal, 10);
     if (!calNum || calNum <= 0) return;
-    onSave({
+    const entry = {
       name: name.trim() || 'Snack',
       cal: calNum,
       protein: parseInt(protein, 10) || 0,
       carbs: parseInt(carbs, 10) || 0,
       fat: parseInt(fat, 10) || 0,
-    });
+    };
+    if (imageData) {
+      entry.photo = await makeThumbnail(imageData.base64);
+    }
+    onSave(entry);
   };
 
   const handleImageSelect = async (e) => {
@@ -61,6 +86,17 @@ export default function AddSnackModal({ onSave, onClose }) {
     const { base64, mimeType } = await resizeImage(file);
     setImageData({ base64, mimeType });
     setError(null);
+  };
+
+  const applyResult = (data) => {
+    setName(data.name || 'Snack');
+    setCal(String(data.cal || ''));
+    setProtein(String(data.protein || ''));
+    setCarbs(String(data.carbs || ''));
+    setFat(String(data.fat || ''));
+    setLastResult(data);
+    setAiDone(true);
+    setRevision('');
   };
 
   const handleAnalyze = async () => {
@@ -76,6 +112,7 @@ export default function AddSnackModal({ onSave, onClose }) {
       if (!imageData) { setLoading(false); return; }
       body.imageBase64 = imageData.base64;
       body.imageMimeType = imageData.mimeType;
+      if (hint.trim()) body.hint = hint.trim();
     }
 
     try {
@@ -89,13 +126,7 @@ export default function AddSnackModal({ onSave, onClose }) {
         throw new Error(errData?.error || `Server error (${res.status})`);
       }
       const data = await res.json();
-      // Prefill the editable fields with AI results
-      setName(data.name || 'Snack');
-      setCal(String(data.cal || ''));
-      setProtein(String(data.protein || ''));
-      setCarbs(String(data.carbs || ''));
-      setFat(String(data.fat || ''));
-      setAiDone(true);
+      applyResult(data);
     } catch (err) {
       setError(err.message || 'Could not analyze. Try again.');
     } finally {
@@ -103,19 +134,47 @@ export default function AddSnackModal({ onSave, onClose }) {
     }
   };
 
+  const handleRevise = async () => {
+    if (!revision.trim() || !lastResult) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/analyze-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'revision',
+          previousResult: lastResult,
+          revision: revision.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Server error (${res.status})`);
+      }
+      const data = await res.json();
+      applyResult(data);
+    } catch (err) {
+      setError(err.message || 'Could not revise. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRedo = () => {
     setAiDone(false);
+    setLastResult(null);
     setName('Snack');
     setCal('');
     setProtein('');
     setCarbs('');
     setFat('');
     setError(null);
+    setRevision('');
   };
 
   const canAnalyze = tab === 'describe' ? text.trim().length > 0 : !!imageData;
-
-  // After AI analysis, show editable form with prefilled values
   const showForm = tab === 'manual' || aiDone;
 
   return createPortal(
@@ -138,7 +197,7 @@ export default function AddSnackModal({ onSave, onClose }) {
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setAiDone(false); setError(null); setName('Snack'); setCal(''); setProtein(''); setCarbs(''); setFat(''); }}
+              onClick={() => { setTab(t.id); handleRedo(); }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 tab === t.id ? 'bg-[#2a2a2a] text-white' : 'text-gray-500'
               }`}
@@ -148,7 +207,7 @@ export default function AddSnackModal({ onSave, onClose }) {
           ))}
         </div>
 
-        {/* Describe input (before AI analysis) */}
+        {/* Describe input */}
         {tab === 'describe' && !aiDone && (
           <>
             <textarea
@@ -179,7 +238,7 @@ export default function AddSnackModal({ onSave, onClose }) {
           </>
         )}
 
-        {/* Photo input (before AI analysis) */}
+        {/* Photo input */}
         {tab === 'photo' && !aiDone && (
           <>
             <div className="mb-3">
@@ -210,6 +269,13 @@ export default function AddSnackModal({ onSave, onClose }) {
                 className="hidden"
               />
             </div>
+            <textarea
+              value={hint}
+              onChange={e => setHint(e.target.value)}
+              placeholder="Optional: describe what's in the photo (e.g. poke bowl without rice, low carb)"
+              rows={2}
+              className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none mb-3"
+            />
             {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
             <button
               onClick={handleAnalyze}
@@ -243,7 +309,7 @@ export default function AddSnackModal({ onSave, onClose }) {
               placeholder="Name"
               className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-white font-semibold mb-3 focus:outline-none focus:border-blue-500"
             />
-            <div className="grid grid-cols-2 gap-3 mb-5">
+            <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Calories *</label>
                 <input
@@ -290,6 +356,32 @@ export default function AddSnackModal({ onSave, onClose }) {
                 />
               </div>
             </div>
+
+            {/* Revision input — shown after AI results */}
+            {aiDone && (
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={revision}
+                  onChange={e => setRevision(e.target.value)}
+                  placeholder="Adjust: e.g. no rice, smaller portion"
+                  className="flex-1 bg-[#111] border border-[#333] rounded-xl px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500"
+                  onKeyDown={e => e.key === 'Enter' && handleRevise()}
+                />
+                <button
+                  onClick={handleRevise}
+                  disabled={!revision.trim() || loading}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                    revision.trim() && !loading ? 'bg-blue-600 text-white active:bg-blue-700' : 'bg-[#333] text-gray-500'
+                  }`}
+                >
+                  {loading ? '...' : 'Revise'}
+                </button>
+              </div>
+            )}
+
+            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+
             <div className="flex gap-3">
               {aiDone ? (
                 <>

@@ -409,6 +409,9 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
                       </button>
                     </div>
                   )}
+                  {display.photo && (
+                    <img src={display.photo} alt="" className="w-full h-24 object-cover rounded-lg mb-1.5" />
+                  )}
                   <div className="flex gap-2">
                     <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{display.cal} cal</span>
                     <span className="text-xs px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">{display.protein}g P</span>
@@ -427,6 +430,9 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
               <span className="w-6 h-6 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0 text-white text-xs">✓</span>
               <div className="flex-1 min-w-0">
                 <span className="font-semibold text-sm">{extra.name}</span>
+                {extra.photo && (
+                  <img src={extra.photo} alt="" className="w-full h-24 object-cover rounded-lg mt-1.5" />
+                )}
                 <div className="flex gap-2 mt-1">
                   <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{extra.cal} cal</span>
                   <span className="text-xs px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">{extra.protein}g P</span>
