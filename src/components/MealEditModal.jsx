@@ -27,24 +27,6 @@ function resizeImage(file, maxSize = 1024) {
   });
 }
 
-function makeThumbnail(base64, maxSize = 200) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      const ratio = Math.min(maxSize / width, maxSize / height);
-      width = Math.round(width * ratio);
-      height = Math.round(height * ratio);
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.6));
-    };
-    img.src = `data:image/jpeg;base64,${base64}`;
-  });
-}
-
 export default function MealEditModal({ meal, onSave, onClose }) {
   const [tab, setTab] = useState('text');
   const [text, setText] = useState('');
@@ -136,7 +118,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!result) return;
     const entry = {
       name: result.name,
@@ -148,7 +130,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
       source: tab,
     };
     if (imageData) {
-      entry.photo = await makeThumbnail(imageData.base64);
+      entry.photo = `data:image/jpeg;base64,${imageData.base64}`;
     }
     onSave(entry);
   };
