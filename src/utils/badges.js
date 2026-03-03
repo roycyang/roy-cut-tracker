@@ -1,12 +1,14 @@
 import { BADGES, XP_VALUES, WEEKLY_TARGETS } from '../data/config';
 import { getCurrentWeek, toDateKey } from './dateUtils';
+import { computeStreaks } from './streaks';
 
-export function checkBadges({ getWeights, getStreaks, getBadges, unlockBadge, addXP, getBarrysCount, getMealChecks, getSuppChecks, getBarrysAttendance }) {
+export function checkBadges(storage) {
+  const { getWeights, getBadges, unlockBadge, addXP, getBarrysCount, getMealChecks, getSuppChecks, getBarrysAttendance } = storage;
   const newlyUnlocked = [];
   const today = new Date();
   const week = getCurrentWeek(today);
   const weights = getWeights();
-  const streaks = getStreaks();
+  const streaks = computeStreaks(storage);
   const badges = getBadges();
 
   // First Blood: log weight on Day 1
@@ -134,7 +136,8 @@ export function checkBadges({ getWeights, getStreaks, getBadges, unlockBadge, ad
   return newlyUnlocked;
 }
 
-export function checkFullSend(dateKey, { getBadges, getBarrysAttendance, getMealChecks, getSuppChecks, unlockBadge, addXP }) {
+export function checkFullSend(dateKey, storage) {
+  const { getBadges, getBarrysAttendance, getMealChecks, getSuppChecks, unlockBadge, addXP } = storage;
   const badges = getBadges();
   if (badges.full_send) return false;
 

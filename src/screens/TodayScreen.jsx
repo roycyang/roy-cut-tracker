@@ -7,7 +7,7 @@ import {
   isWaterCutPeriod, isFinalWeek, getWeekTarget, formatDateShort,
 } from '../utils/dateUtils';
 import { useStorage } from '../hooks/useStorage';
-import { recalculateStreaks, getStreakClass } from '../utils/streaks';
+import { computeStreaks, getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
 import { playMealCheck, playAllMealsDone, playWeeklyTargetHit } from '../utils/sounds';
 import WeightModal from '../components/WeightModal';
@@ -100,7 +100,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
     setShowWorkoutPicker(false);
   };
 
-  const streaks = recalculateStreaks(storage);
+  const streaks = computeStreaks(storage);
   const { meals, isBarrysDay, barrysNote } = getMealsForDay(viewDate, phase);
 
   const dayOfYear = Math.floor((viewDate - new Date(viewDate.getFullYear(), 0, 0)) / 86400000);
@@ -133,7 +133,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
     const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-    recalculateStreaks(storage);
+    computeStreaks(storage);
   }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday, storage]);
 
   const handleCheck = useCallback((id, checked) => {
@@ -154,7 +154,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
     const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-    recalculateStreaks(storage);
+    computeStreaks(storage);
   }, [dateKey, mealChecks, onToast, onBadgeUnlock, storage]);
 
   const handleMealOverrideSave = useCallback((mealId, overrideData) => {

@@ -1,6 +1,6 @@
 import { toDateKey } from './dateUtils';
 
-export function recalculateStreaks({ getWeights, getMealChecks, getSuppChecks, getStreaks, setStreaks }) {
+export function computeStreaks({ getWeights, getMealChecks, getSuppChecks }) {
   const today = new Date();
   const weights = getWeights();
   let loggingStreak = 0;
@@ -45,15 +45,11 @@ export function recalculateStreaks({ getWeights, getMealChecks, getSuppChecks, g
     }
   }
 
-  const current = getStreaks();
-  const updated = {
+  return {
     logging: loggingStreak,
     meals: mealStreak,
     supplements: suppStreak,
-    barrys: current.barrys || 0,
   };
-  setStreaks(updated);
-  return updated;
 }
 
 export function getStreakClass(count) {

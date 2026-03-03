@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { XP_VALUES } from '../data/config';
 import { toDateKey, getCurrentPhase, getCurrentWeek } from '../utils/dateUtils';
 import { useStorage } from '../hooks/useStorage';
-import { getStreakClass } from '../utils/streaks';
+import { computeStreaks, getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
 
 export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
@@ -16,7 +16,7 @@ export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
   const barrysAttendance = storage.getBarrysAttendance();
   const barrysCount = storage.getBarrysCount();
   const barrysDoneToday = !!barrysAttendance[dateKey];
-  const streaks = storage.getStreaks();
+  const streaks = computeStreaks(storage);
 
   const handleBarrysCheck = useCallback(() => {
     storage.setBarrysAttended(dateKey);
