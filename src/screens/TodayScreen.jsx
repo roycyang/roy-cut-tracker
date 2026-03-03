@@ -391,7 +391,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
                     <span className="font-semibold text-sm">{display.name}</span>
                     <button
                       onClick={() => setEditingMeal(meal)}
-                      className="ml-auto text-gray-600 active:text-blue-400 p-1 -m-1"
+                      className="ml-auto text-gray-600 active:text-blue-400 p-2 -m-2"
                       title="Edit meal"
                     >
                       ✏️

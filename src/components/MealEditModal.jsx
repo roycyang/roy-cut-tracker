@@ -100,9 +100,9 @@ export default function MealEditModal({ meal, onSave, onClose }) {
   const canAnalyze = tab === 'text' ? text.trim().length > 0 : !!imageData;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto animate-slide-up"
+        className="bg-[#1a1a1a] rounded-2xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
