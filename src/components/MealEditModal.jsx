@@ -27,13 +27,14 @@ function resizeImage(file, maxSize = 1024) {
   });
 }
 
-export default function MealEditModal({ meal, onSave, onClose }) {
+export default function MealEditModal({ meal, override, onSave, onClose }) {
+  const initial = override || meal;
   const [tab, setTab] = useState('manual');
-  const [name, setName] = useState(meal.name);
-  const [cal, setCal] = useState(String(meal.cal));
-  const [protein, setProtein] = useState(String(meal.protein));
-  const [carbs, setCarbs] = useState(String(meal.carbs));
-  const [fat, setFat] = useState(String(meal.fat || ''));
+  const [name, setName] = useState(initial.name);
+  const [cal, setCal] = useState(String(initial.cal));
+  const [protein, setProtein] = useState(String(initial.protein));
+  const [carbs, setCarbs] = useState(String(initial.carbs));
+  const [fat, setFat] = useState(String(initial.fat || ''));
   const [text, setText] = useState('');
   const [hint, setHint] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
