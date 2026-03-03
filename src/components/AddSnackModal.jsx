@@ -38,11 +38,11 @@ export default function AddSnackModal({ onSave, onClose }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageData, setImageData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
+  const [aiDone, setAiDone] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
-  const handleManualSave = () => {
+  const handleSave = () => {
     const calNum = parseInt(cal, 10);
     if (!calNum || calNum <= 0) return;
     onSave({
@@ -66,7 +66,6 @@ export default function AddSnackModal({ onSave, onClose }) {
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
-    setResult(null);
 
     const body = { type: tab === 'describe' ? 'text' : 'image' };
 
@@ -85,28 +84,39 @@ export default function AddSnackModal({ onSave, onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Analysis failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `Server error (${res.status})`);
+      }
       const data = await res.json();
-      setResult(data);
-    } catch {
-      setError('Could not analyze. Try again.');
+      // Prefill the editable fields with AI results
+      setName(data.name || 'Snack');
+      setCal(String(data.cal || ''));
+      setProtein(String(data.protein || ''));
+      setCarbs(String(data.carbs || ''));
+      setFat(String(data.fat || ''));
+      setAiDone(true);
+    } catch (err) {
+      setError(err.message || 'Could not analyze. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUseResult = () => {
-    if (!result) return;
-    onSave({
-      name: result.name,
-      cal: result.cal,
-      protein: result.protein,
-      carbs: result.carbs,
-      fat: result.fat,
-    });
+  const handleRedo = () => {
+    setAiDone(false);
+    setName('Snack');
+    setCal('');
+    setProtein('');
+    setCarbs('');
+    setFat('');
+    setError(null);
   };
 
   const canAnalyze = tab === 'describe' ? text.trim().length > 0 : !!imageData;
+
+  // After AI analysis, show editable form with prefilled values
+  const showForm = tab === 'manual' || aiDone;
 
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -128,7 +138,7 @@ export default function AddSnackModal({ onSave, onClose }) {
           ].map(t => (
             <button
               key={t.id}
-              onClick={() => { setTab(t.id); setResult(null); setError(null); }}
+              onClick={() => { setTab(t.id); setAiDone(false); setError(null); setName('Snack'); setCal(''); setProtein(''); setCarbs(''); setFat(''); }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 tab === t.id ? 'bg-[#2a2a2a] text-white' : 'text-gray-500'
               }`}
@@ -138,9 +148,94 @@ export default function AddSnackModal({ onSave, onClose }) {
           ))}
         </div>
 
-        {/* Manual tab */}
-        {tab === 'manual' && (
+        {/* Describe input (before AI analysis) */}
+        {tab === 'describe' && !aiDone && (
           <>
+            <textarea
+              autoFocus
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="e.g. protein bar 200cal, handful of almonds, greek yogurt with honey"
+              rows={3}
+              className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none mb-3"
+            />
+            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+            <button
+              onClick={handleAnalyze}
+              disabled={!canAnalyze || loading}
+              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${
+                canAnalyze && !loading ? 'bg-blue-600 active:bg-blue-700' : 'bg-[#333] text-gray-500'
+              }`}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Analyzing...
+                </span>
+              ) : (
+                'Analyze with AI'
+              )}
+            </button>
+          </>
+        )}
+
+        {/* Photo input (before AI analysis) */}
+        {tab === 'photo' && !aiDone && (
+          <>
+            <div className="mb-3">
+              {imagePreview ? (
+                <div className="relative">
+                  <img src={imagePreview} alt="Snack" className="w-full h-48 object-cover rounded-xl" />
+                  <button
+                    onClick={() => { setImagePreview(null); setImageData(null); }}
+                    className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white text-sm"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-36 border-2 border-dashed border-[#333] rounded-xl flex flex-col items-center justify-center text-gray-500 active:border-blue-500"
+                >
+                  <span className="text-3xl mb-1">📷</span>
+                  <span className="text-sm">Tap to take or choose a photo</span>
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </div>
+            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
+            <button
+              onClick={handleAnalyze}
+              disabled={!canAnalyze || loading}
+              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${
+                canAnalyze && !loading ? 'bg-blue-600 active:bg-blue-700' : 'bg-[#333] text-gray-500'
+              }`}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Analyzing...
+                </span>
+              ) : (
+                'Analyze with AI'
+              )}
+            </button>
+          </>
+        )}
+
+        {/* Editable form: shown for Manual tab always, or after AI prefill */}
+        {showForm && (
+          <>
+            {aiDone && (
+              <p className="text-[10px] text-blue-400 uppercase tracking-wide mb-2">AI Estimate — edit if needed</p>
+            )}
             <input
               type="text"
               value={name}
@@ -154,7 +249,7 @@ export default function AddSnackModal({ onSave, onClose }) {
                 <input
                   type="number"
                   inputMode="numeric"
-                  autoFocus
+                  autoFocus={tab === 'manual'}
                   value={cal}
                   onChange={e => setCal(e.target.value)}
                   placeholder="0"
@@ -196,140 +291,25 @@ export default function AddSnackModal({ onSave, onClose }) {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-[#333] text-gray-300 font-semibold">
-                Cancel
-              </button>
-              <button onClick={handleManualSave} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold">
-                Add
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Describe tab */}
-        {tab === 'describe' && !result && (
-          <>
-            <textarea
-              autoFocus
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="e.g. protein bar 200cal, handful of almonds, greek yogurt with honey"
-              rows={3}
-              className="w-full bg-[#111] border border-[#333] rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 resize-none mb-3"
-            />
-            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
-            <button
-              onClick={handleAnalyze}
-              disabled={!canAnalyze || loading}
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${
-                canAnalyze && !loading ? 'bg-blue-600 active:bg-blue-700' : 'bg-[#333] text-gray-500'
-              }`}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Analyzing...
-                </span>
-              ) : (
-                'Analyze with AI'
-              )}
-            </button>
-          </>
-        )}
-
-        {/* Photo tab */}
-        {tab === 'photo' && !result && (
-          <>
-            <div className="mb-3">
-              {imagePreview ? (
-                <div className="relative">
-                  <img src={imagePreview} alt="Snack" className="w-full h-48 object-cover rounded-xl" />
-                  <button
-                    onClick={() => { setImagePreview(null); setImageData(null); }}
-                    className="absolute top-2 right-2 w-7 h-7 bg-black/60 rounded-full flex items-center justify-center text-white text-sm"
-                  >
-                    &times;
+              {aiDone ? (
+                <>
+                  <button onClick={handleRedo} className="flex-1 py-3 rounded-xl bg-[#333] text-gray-300 font-semibold">
+                    Redo
                   </button>
-                </div>
+                  <button onClick={handleSave} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold">
+                    Save
+                  </button>
+                </>
               ) : (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full h-36 border-2 border-dashed border-[#333] rounded-xl flex flex-col items-center justify-center text-gray-500 active:border-blue-500"
-                >
-                  <span className="text-3xl mb-1">📷</span>
-                  <span className="text-sm">Tap to take or choose a photo</span>
-                </button>
+                <>
+                  <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-[#333] text-gray-300 font-semibold">
+                    Cancel
+                  </button>
+                  <button onClick={handleSave} className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold">
+                    Add
+                  </button>
+                </>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleImageSelect}
-                className="hidden"
-              />
-            </div>
-            {error && <p className="text-red-400 text-xs mb-3">{error}</p>}
-            <button
-              onClick={handleAnalyze}
-              disabled={!canAnalyze || loading}
-              className={`w-full py-3 rounded-xl font-semibold text-white transition-colors ${
-                canAnalyze && !loading ? 'bg-blue-600 active:bg-blue-700' : 'bg-[#333] text-gray-500'
-              }`}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Analyzing...
-                </span>
-              ) : (
-                'Analyze with AI'
-              )}
-            </button>
-          </>
-        )}
-
-        {/* AI Result view (shared by describe & photo tabs) */}
-        {(tab === 'describe' || tab === 'photo') && result && (
-          <>
-            <div className="bg-blue-900/20 border border-blue-800/30 rounded-xl p-4 mb-4">
-              <p className="text-[10px] text-blue-400 uppercase tracking-wide mb-2">AI Estimate</p>
-              <p className="text-sm font-semibold mb-3">{result.name}</p>
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div>
-                  <p className="text-gray-500 mb-1">Cal</p>
-                  <p className="text-orange-400 font-bold text-base">{result.cal}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Protein</p>
-                  <p className="text-blue-400 font-bold text-base">{result.protein}g</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Carbs</p>
-                  <p className="text-green-400 font-bold text-base">{result.carbs}g</p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Fat</p>
-                  <p className="text-yellow-400 font-bold text-base">{result.fat}g</p>
-                </div>
-              </div>
-            </div>
-            {result.ingredients && (
-              <p className="text-xs text-gray-500 mb-3">{result.ingredients}</p>
-            )}
-            <div className="flex gap-3">
-              <button
-                onClick={() => { setResult(null); setError(null); }}
-                className="flex-1 py-3 rounded-xl bg-[#333] text-gray-300 font-semibold"
-              >
-                Redo
-              </button>
-              <button
-                onClick={handleUseResult}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white font-semibold"
-              >
-                Use This
-              </button>
             </div>
           </>
         )}

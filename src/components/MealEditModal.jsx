@@ -52,7 +52,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
     setResult(null);
 
     const body = {
-      type: tab,
+      type: tab === 'photo' ? 'image' : tab,
       plannedMeal: `${meal.name} — ${meal.ingredients}`,
     };
 
@@ -170,7 +170,6 @@ export default function MealEditModal({ meal, onSave, onClose }) {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={handleImageSelect}
                   className="hidden"
                 />
