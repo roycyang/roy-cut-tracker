@@ -60,6 +60,22 @@ export function useStorage() {
     upsertDailyLog(dateKey, { meal_overrides: current });
   }, [dailyLogs, upsertDailyLog]);
 
+  // ── Extra Meals ──
+  const getExtraMeals = useCallback((dateKey) => {
+    return dailyLogs[dateKey]?.extra_meals || [];
+  }, [dailyLogs]);
+
+  const addExtraMeal = useCallback((dateKey, meal) => {
+    const current = dailyLogs[dateKey]?.extra_meals || [];
+    const entry = { id: `extra_${Date.now()}`, ...meal, timestamp: new Date().toISOString() };
+    upsertDailyLog(dateKey, { extra_meals: [...current, entry] });
+  }, [dailyLogs, upsertDailyLog]);
+
+  const removeExtraMeal = useCallback((dateKey, mealId) => {
+    const current = dailyLogs[dateKey]?.extra_meals || [];
+    upsertDailyLog(dateKey, { extra_meals: current.filter(m => m.id !== mealId) });
+  }, [dailyLogs, upsertDailyLog]);
+
   // ── Workouts ──
   const getWorkoutForDate = useCallback((dateKey) => {
     return dailyLogs[dateKey]?.workout || null;
@@ -167,6 +183,7 @@ export function useStorage() {
     getMealChecks, setMealCheck,
     getSuppChecks, setSuppCheck,
     getMealOverrides, setMealOverride, clearMealOverride,
+    getExtraMeals, addExtraMeal, removeExtraMeal,
     getWorkoutForDate, setWorkoutForDate,
     getBarrysAttendance, setBarrysAttended, getBarrysCount,
     getBadges, unlockBadge,

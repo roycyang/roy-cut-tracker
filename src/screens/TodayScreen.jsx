@@ -12,6 +12,7 @@ import { checkBadges } from '../utils/badges';
 import { playMealCheck, playAllMealsDone, playWeeklyTargetHit } from '../utils/sounds';
 import WeightModal from '../components/WeightModal';
 import MealEditModal from '../components/MealEditModal';
+import AddSnackModal from '../components/AddSnackModal';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -46,6 +47,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
   const [editingMeal, setEditingMeal] = useState(null);
+  const [showAddSnack, setShowAddSnack] = useState(false);
 
   const viewDate = useMemo(() => {
     const d = new Date();
@@ -168,13 +170,16 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
   // Resolve meals: use override macros when present
   const resolvedMeals = meals.map(m => overrides[m.id] ? { ...m, ...overrides[m.id] } : m);
+  const extraMeals = storage.getExtraMeals(dateKey);
 
-  // Macro totals (only from the 3 meals, using overrides)
+  // Macro totals (planned meals + extra meals)
   const checkedMeals = resolvedMeals.filter(m => mealChecks[m.id]);
-  const totalCal = checkedMeals.reduce((s, m) => s + m.cal, 0);
-  const totalProtein = checkedMeals.reduce((s, m) => s + m.protein, 0);
-  const allCal = resolvedMeals.reduce((s, m) => s + m.cal, 0);
-  const allProtein = resolvedMeals.reduce((s, m) => s + m.protein, 0);
+  const extraCal = extraMeals.reduce((s, m) => s + m.cal, 0);
+  const extraProtein = extraMeals.reduce((s, m) => s + m.protein, 0);
+  const totalCal = checkedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
+  const totalProtein = checkedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
+  const allCal = resolvedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
+  const allProtein = resolvedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
 
   const dateDisplay = isToday
     ? `Today — ${DAY_NAMES[viewDate.getDay()]}, ${formatDateShort(viewDate)}`
@@ -407,6 +412,37 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
             </div>
           );
         })}
+
+        {/* Extra Meals / Snacks */}
+        {extraMeals.map(extra => (
+          <div key={extra.id} className="bg-[#1a1a1a] rounded-xl p-4 border border-green-800/40 transition-all">
+            <div className="flex items-center gap-3">
+              <span className="w-6 h-6 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0 text-white text-xs">✓</span>
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-sm">{extra.name}</span>
+                <div className="flex gap-2 mt-1">
+                  <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{extra.cal} cal</span>
+                  <span className="text-xs px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">{extra.protein}g P</span>
+                  <span className="text-xs px-2 py-0.5 bg-green-900/30 text-green-400 rounded-full">{extra.carbs}g C</span>
+                </div>
+              </div>
+              <button
+                onClick={() => storage.removeExtraMeal(dateKey, extra.id)}
+                className="text-gray-600 active:text-red-400 p-1 -m-1 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Add Snack button */}
+        <button
+          onClick={() => setShowAddSnack(true)}
+          className="w-full py-3 border-2 border-dashed border-[#333] rounded-xl text-gray-500 text-sm font-medium active:border-gray-400 active:text-gray-300 transition-colors"
+        >
+          + Add Snack
+        </button>
       </div>
 
       {/* Macro totals bar */}
@@ -431,6 +467,16 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
           meal={editingMeal}
           onSave={(data) => handleMealOverrideSave(editingMeal.id, data)}
           onClose={() => setEditingMeal(null)}
+        />
+      )}
+
+      {showAddSnack && (
+        <AddSnackModal
+          onSave={(meal) => {
+            storage.addExtraMeal(dateKey, meal);
+            setShowAddSnack(false);
+          }}
+          onClose={() => setShowAddSnack(false)}
         />
       )}
     </div>
