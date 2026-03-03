@@ -149,6 +149,12 @@ export function useStorage() {
     updateUserState({ settings: { ...userState.settings, goalWeight: weight } });
   }, [userState, updateUserState]);
 
+  const getTheme = useCallback(() => userState.settings?.theme ?? 'dark', [userState]);
+
+  const setTheme = useCallback((theme) => {
+    updateUserState({ settings: { ...userState.settings, theme } });
+  }, [userState, updateUserState]);
+
   const getPhaseTransitionsShown = useCallback(() => userState.settings?.phaseTransitions ?? {}, [userState]);
 
   const markPhaseTransitionShown = useCallback((phase) => {
@@ -190,6 +196,7 @@ export function useStorage() {
     getXP, addXP,
     getStreaks, setStreaks,
     isSoundEnabled, setSoundEnabled,
+    getTheme, setTheme,
     getPhaseOverride, setPhaseOverride,
     getGoalWeight, setGoalWeight,
     getPhaseTransitionsShown, markPhaseTransitionShown,

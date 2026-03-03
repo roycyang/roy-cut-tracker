@@ -27,7 +27,63 @@ body {
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  transition: background-color 0.3s, color 0.3s;
 }
+
+/* ── Light mode overrides ── */
+body.light {
+  background-color: #f5f5f5;
+  color: #111827;
+}
+
+/* Backgrounds */
+body.light .bg-\[\#1a1a1a\] { background-color: #ffffff !important; }
+body.light .bg-\[\#111\] { background-color: #f3f4f6 !important; }
+body.light .bg-\[\#0f0f0f\] { background-color: #f5f5f5 !important; }
+body.light .bg-\[\#333\] { background-color: #e5e7eb !important; }
+body.light .bg-\[\#222\] { background-color: #e5e7eb !important; }
+body.light .bg-\[\#2a2a2a\] { background-color: #e5e7eb !important; }
+body.light .bg-\[\#252525\] { background-color: #e5e7eb !important; }
+
+/* Borders */
+body.light .border-\[\#333\] { border-color: #d1d5db !important; }
+body.light .border-\[\#2a2a2a\] { border-color: #e5e7eb !important; }
+body.light .border-transparent { border-color: transparent !important; }
+
+/* Text colors — content text only, not colored button labels */
+body.light .text-white { color: #111827 !important; }
+body.light .text-gray-300 { color: #374151 !important; }
+body.light .text-gray-400 { color: #4b5563 !important; }
+body.light .text-gray-500 { color: #6b7280 !important; }
+body.light .text-gray-600 { color: #9ca3af !important; }
+body.light .text-gray-700 { color: #9ca3af !important; }
+body.light .placeholder-gray-600::placeholder { color: #9ca3af !important; }
+
+/* Preserve white text on colored buttons */
+body.light .bg-green-600 .text-white,
+body.light .bg-green-600.text-white,
+body.light .bg-blue-600 .text-white,
+body.light .bg-blue-600.text-white,
+body.light .bg-red-600 .text-white,
+body.light .bg-red-600.text-white,
+body.light .bg-purple-600 .text-white,
+body.light .bg-purple-600.text-white,
+body.light .bg-green-600,
+body.light .bg-blue-600,
+body.light .bg-red-600,
+body.light .bg-purple-600 { color: inherit; }
+body.light [class*="bg-green-6"][class*="text-white"],
+body.light [class*="bg-blue-6"][class*="text-white"],
+body.light [class*="bg-red-6"][class*="text-white"],
+body.light [class*="bg-purple-6"][class*="text-white"] { color: #ffffff !important; }
+
+/* Modal overlays */
+body.light .bg-black\/70 { background-color: rgba(0, 0, 0, 0.4) !important; }
+body.light .bg-black\/90 { background-color: rgba(0, 0, 0, 0.6) !important; }
+body.light .bg-black\/60 { background-color: rgba(0, 0, 0, 0.5) !important; }
+
+/* Bottom nav */
+body.light .border-t { border-color: #e5e7eb !important; }
 
 #root {
   min-height: 100dvh;

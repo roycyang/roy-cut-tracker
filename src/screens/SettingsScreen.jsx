@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useStorage } from '../hooks/useStorage';
 
-export default function SettingsScreen({ onSoundToggle }) {
+export default function SettingsScreen({ onSoundToggle, onThemeToggle }) {
   const storage = useStorage();
 
   const [sound, setSound] = useState(storage.isSoundEnabled());
+  const [theme, setThemeState] = useState(storage.getTheme());
   const [goalWeight, setGoalWeightState] = useState(storage.getGoalWeight());
   const [phaseOverride, setPhaseOverrideState] = useState(storage.getPhaseOverride());
   const [showReset, setShowReset] = useState(false);
@@ -16,6 +17,13 @@ export default function SettingsScreen({ onSoundToggle }) {
     setSound(next);
     storage.setSoundEnabled(next);
     onSoundToggle?.(next);
+  };
+
+  const handleThemeToggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setThemeState(next);
+    storage.setTheme(next);
+    onThemeToggle?.(next);
   };
 
   const handleGoalSave = () => {
@@ -98,6 +106,25 @@ export default function SettingsScreen({ onSoundToggle }) {
         {phaseOverride && (
           <p className="text-xs text-yellow-500 mt-2">Manual override active — tap again to disable</p>
         )}
+      </div>
+
+      {/* Theme */}
+      <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3">
+        <div className="flex items-center justify-between">
+          <span className="font-medium text-sm">Light Mode</span>
+          <button
+            onClick={handleThemeToggle}
+            className={`w-12 h-7 rounded-full relative transition-colors ${
+              theme === 'light' ? 'bg-green-600' : 'bg-gray-700'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                theme === 'light' ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Sound */}

@@ -23,6 +23,14 @@ export default function App() {
   const [phaseTransition, setPhaseTransition] = useState(null);
   const [soundOn, setSoundOn] = useState(true);
 
+  // Apply theme class to body
+  useEffect(() => {
+    if (!loading) {
+      const theme = storage.getTheme();
+      document.body.classList.toggle('light', theme === 'light');
+    }
+  }, [loading, storage]);
+
   // Wire up sound check to use context-backed setting
   useEffect(() => {
     setSoundCheck(() => storage.isSoundEnabled());
@@ -63,6 +71,10 @@ export default function App() {
     storage.setSoundEnabled(next);
   }, [soundOn, storage]);
 
+  const handleThemeToggle = useCallback((theme) => {
+    document.body.classList.toggle('light', theme === 'light');
+  }, []);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -85,7 +97,7 @@ export default function App() {
       case 'supplements':
         return <SupplementsScreen onToast={showToast} onBadgeUnlock={handleBadgeUnlock} />;
       case 'settings':
-        return <SettingsScreen onSoundToggle={handleSoundToggle} />;
+        return <SettingsScreen onSoundToggle={handleSoundToggle} onThemeToggle={handleThemeToggle} />;
       default:
         return <TodayScreen onToast={showToast} onBadgeUnlock={handleBadgeUnlock} />;
     }
