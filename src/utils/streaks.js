@@ -1,28 +1,21 @@
 import { toDateKey } from './dateUtils';
-import { getWeights, getMealChecks, getSuppChecks, getStreaks, setStreaks } from './storage';
 
-export function recalculateStreaks() {
+export function recalculateStreaks({ getWeights, getMealChecks, getSuppChecks, getStreaks, setStreaks }) {
   const today = new Date();
+  const weights = getWeights();
   let loggingStreak = 0;
   let mealStreak = 0;
   let suppStreak = 0;
 
-  // Count backward from today
+  // Logging streak: count backward from today
   for (let i = 0; i < 100; i++) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
     const key = toDateKey(d);
-
-    // Don't count future days or if we haven't reached today yet
-    if (i === 0) {
-      // Today: check if logged
-      const weights = getWeights();
-      if (weights[key]) loggingStreak++;
-      else break;
+    if (weights[key]) {
+      loggingStreak++;
     } else {
-      const weights = getWeights();
-      if (weights[key]) loggingStreak++;
-      else break;
+      break;
     }
   }
 
@@ -34,10 +27,6 @@ export function recalculateStreaks() {
     const checks = getMealChecks(key);
     if (checks.meal1 && checks.meal2 && checks.meal3) {
       mealStreak++;
-    } else if (i === 0) {
-      // Today can be incomplete, don't break but don't count
-      // Only count if all checked
-      break;
     } else {
       break;
     }
@@ -51,8 +40,6 @@ export function recalculateStreaks() {
     const checks = getSuppChecks(key);
     if (checks.preworkout && checks.creatine && checks.whey && checks.collagen) {
       suppStreak++;
-    } else if (i === 0) {
-      break;
     } else {
       break;
     }

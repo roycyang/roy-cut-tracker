@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import {
-  isSoundEnabled, setSoundEnabled, getGoalWeight, setGoalWeight as saveGoalWeight,
-  getPhaseOverride, setPhaseOverride, exportWeightsCSV, resetAllData,
-} from '../utils/storage';
+import { useStorage } from '../hooks/useStorage';
 
 export default function SettingsScreen({ onSoundToggle }) {
-  const [sound, setSound] = useState(isSoundEnabled());
-  const [goalWeight, setGoalWeightState] = useState(getGoalWeight());
-  const [phaseOverride, setPhaseOverrideState] = useState(getPhaseOverride());
+  const storage = useStorage();
+
+  const [sound, setSound] = useState(storage.isSoundEnabled());
+  const [goalWeight, setGoalWeightState] = useState(storage.getGoalWeight());
+  const [phaseOverride, setPhaseOverrideState] = useState(storage.getPhaseOverride());
   const [showReset, setShowReset] = useState(false);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState(String(goalWeight));
@@ -15,14 +14,14 @@ export default function SettingsScreen({ onSoundToggle }) {
   const handleSoundToggle = () => {
     const next = !sound;
     setSound(next);
-    setSoundEnabled(next);
+    storage.setSoundEnabled(next);
     onSoundToggle?.(next);
   };
 
   const handleGoalSave = () => {
     const num = parseFloat(goalInput);
     if (num > 0 && num < 300) {
-      saveGoalWeight(num);
+      storage.setGoalWeight(num);
       setGoalWeightState(num);
       setEditingGoal(false);
     }
@@ -30,12 +29,12 @@ export default function SettingsScreen({ onSoundToggle }) {
 
   const handlePhaseOverride = (p) => {
     const val = p === phaseOverride ? null : p;
-    setPhaseOverride(val);
+    storage.setPhaseOverride(val);
     setPhaseOverrideState(val);
   };
 
   const handleExport = () => {
-    const csv = exportWeightsCSV();
+    const csv = storage.exportWeightsCSV();
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -46,8 +45,7 @@ export default function SettingsScreen({ onSoundToggle }) {
   };
 
   const handleReset = () => {
-    resetAllData();
-    window.location.reload();
+    storage.resetAllData();
   };
 
   return (

@@ -1,8 +1,7 @@
 import { BADGES, XP_VALUES, WEEKLY_TARGETS } from '../data/config';
 import { getCurrentWeek, toDateKey } from './dateUtils';
-import { unlockBadge, getBadges, getWeights, getStreaks, getBarrysCount, getBarrysAttendance, getMealChecks, getSuppChecks, addXP } from './storage';
 
-export function checkBadges() {
+export function checkBadges({ getWeights, getStreaks, getBadges, unlockBadge, addXP, getBarrysCount, getMealChecks, getSuppChecks, getBarrysAttendance }) {
   const newlyUnlocked = [];
   const today = new Date();
   const week = getCurrentWeek(today);
@@ -70,7 +69,7 @@ export function checkBadges() {
   if (!badges.on_target) {
     for (const wt of WEEKLY_TARGETS) {
       if (wt.week > week) break;
-      const weekWeights = getWeightsForWeek(wt.week);
+      const weekWeights = getWeightsForWeek(wt.week, weights);
       if (weekWeights.length > 0) {
         const avg = weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length;
         if (avg <= wt.target) {
@@ -89,7 +88,7 @@ export function checkBadges() {
     let consecutive = 0;
     for (const wt of WEEKLY_TARGETS) {
       if (wt.week > week) break;
-      const weekWeights = getWeightsForWeek(wt.week);
+      const weekWeights = getWeightsForWeek(wt.week, weights);
       if (weekWeights.length > 0) {
         const avg = weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length;
         consecutive = avg <= wt.target ? consecutive + 1 : 0;
@@ -135,7 +134,7 @@ export function checkBadges() {
   return newlyUnlocked;
 }
 
-export function checkFullSend(dateKey) {
+export function checkFullSend(dateKey, { getBadges, getBarrysAttendance, getMealChecks, getSuppChecks, unlockBadge, addXP }) {
   const badges = getBadges();
   if (badges.full_send) return false;
 
@@ -156,8 +155,7 @@ export function checkFullSend(dateKey) {
   return false;
 }
 
-export function getWeightsForWeek(weekNum) {
-  const weights = getWeights();
+export function getWeightsForWeek(weekNum, weights) {
   const startDate = new Date(WEEKLY_TARGETS[weekNum - 1].startDate);
   const result = [];
   for (let i = 0; i < 7; i++) {

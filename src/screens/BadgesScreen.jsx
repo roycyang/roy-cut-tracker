@@ -1,7 +1,8 @@
 import { BADGES } from '../data/config';
-import { getBadges } from '../utils/storage';
+import { useStorage } from '../hooks/useStorage';
 
 export default function BadgesScreen() {
+  const { getBadges } = useStorage();
   const unlockedBadges = getBadges();
 
   return (

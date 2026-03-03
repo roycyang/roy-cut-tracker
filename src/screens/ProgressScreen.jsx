@@ -1,10 +1,11 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { WEEKLY_TARGETS, PHASE_CONFIG, START_WEIGHT } from '../data/config';
-import { getCurrentWeek, toDateKey, formatDateRange, getWeekDateRange } from '../utils/dateUtils';
-import { getWeights, getXP } from '../utils/storage';
+import { getCurrentWeek, formatDateRange, getWeekDateRange } from '../utils/dateUtils';
+import { useStorage } from '../hooks/useStorage';
 import { getWeightsForWeek } from '../utils/badges';
 
 export default function ProgressScreen() {
+  const { getWeights, getXP } = useStorage();
   const today = new Date();
   const currentWeek = getCurrentWeek(today);
   const weights = getWeights();
@@ -12,7 +13,7 @@ export default function ProgressScreen() {
 
   // Build chart data
   const chartData = WEEKLY_TARGETS.map(wt => {
-    const weekWeights = getWeightsForWeek(wt.week);
+    const weekWeights = getWeightsForWeek(wt.week, weights);
     const avg = weekWeights.length > 0
       ? parseFloat((weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length).toFixed(1))
       : null;
@@ -67,7 +68,7 @@ export default function ProgressScreen() {
       <div className="space-y-2 mb-4">
         {WEEKLY_TARGETS.map(wt => {
           const { start, end } = getWeekDateRange(wt.week);
-          const weekWeights = getWeightsForWeek(wt.week);
+          const weekWeights = getWeightsForWeek(wt.week, weights);
           const avg = weekWeights.length > 0
             ? (weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length).toFixed(1)
             : null;

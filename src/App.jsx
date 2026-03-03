@@ -8,28 +8,46 @@ import ProgressScreen from './screens/ProgressScreen';
 import BadgesScreen from './screens/BadgesScreen';
 import SupplementsScreen from './screens/SupplementsScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { isSoundEnabled, setSoundEnabled, getPhaseOverride, getPhaseTransitionsShown, markPhaseTransitionShown } from './utils/storage';
+import { useData } from './context/DataContext';
+import { useStorage } from './hooks/useStorage';
 import { getCurrentPhase } from './utils/dateUtils';
+import { setSoundCheck } from './utils/sounds';
 
 export default function App() {
+  const { loading } = useData();
+  const storage = useStorage();
+
   const [screen, setScreen] = useState('today');
   const [toast, setToast] = useState(null);
   const [badgeUnlock, setBadgeUnlock] = useState(null);
   const [phaseTransition, setPhaseTransition] = useState(null);
-  const [soundOn, setSoundOn] = useState(isSoundEnabled());
+  const [soundOn, setSoundOn] = useState(true);
 
-  // Check phase transitions on mount
+  // Wire up sound check to use context-backed setting
   useEffect(() => {
-    const phase = getCurrentPhase(new Date(), getPhaseOverride());
-    const shown = getPhaseTransitionsShown();
+    setSoundCheck(() => storage.isSoundEnabled());
+  }, [storage]);
+
+  // Initialize sound state once loading is done
+  useEffect(() => {
+    if (!loading) {
+      setSoundOn(storage.isSoundEnabled());
+    }
+  }, [loading, storage]);
+
+  // Check phase transitions on mount (after data loads)
+  useEffect(() => {
+    if (loading) return;
+    const phase = getCurrentPhase(new Date(), storage.getPhaseOverride());
+    const shown = storage.getPhaseTransitionsShown();
     if (phase >= 2 && !shown[2]) {
       setPhaseTransition(2);
-      markPhaseTransitionShown(2);
+      storage.markPhaseTransitionShown(2);
     } else if (phase >= 3 && !shown[3]) {
       setPhaseTransition(3);
-      markPhaseTransitionShown(3);
+      storage.markPhaseTransitionShown(3);
     }
-  }, []);
+  }, [loading, storage]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -42,8 +60,19 @@ export default function App() {
   const handleSoundToggle = useCallback(() => {
     const next = !soundOn;
     setSoundOn(next);
-    setSoundEnabled(next);
-  }, [soundOn]);
+    storage.setSoundEnabled(next);
+  }, [soundOn, storage]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-gray-700 border-t-white rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderScreen = () => {
     switch (screen) {

@@ -1,14 +1,17 @@
-import { isSoundEnabled } from './storage';
-
 let audioCtx = null;
+let soundCheck = () => true;
 
 function getCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
 
+export function setSoundCheck(fn) {
+  soundCheck = fn;
+}
+
 function playTone(freq, duration = 0.15, type = 'sine', gain = 0.3, startTime = 0) {
-  if (!isSoundEnabled()) return;
+  if (!soundCheck()) return;
   const ctx = getCtx();
   const osc = ctx.createOscillator();
   const vol = ctx.createGain();
@@ -63,7 +66,7 @@ export function playWeeklyTargetHit() {
 }
 
 export function playFinalGoalFanfare() {
-  if (!isSoundEnabled()) return;
+  if (!soundCheck()) return;
   // Full fanfare
   playTone(523, 0.2, 'triangle', 0.5);
   playTone(659, 0.2, 'triangle', 0.5, 0.2);

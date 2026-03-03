@@ -1,32 +1,30 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { XP_VALUES } from '../data/config';
 import { toDateKey, getCurrentPhase, getCurrentWeek } from '../utils/dateUtils';
-import {
-  addXP, getPhaseOverride, getBarrysCount, setBarrysAttended, getBarrysAttendance,
-  getStreaks,
-} from '../utils/storage';
+import { useStorage } from '../hooks/useStorage';
 import { getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
 
 export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
+  const storage = useStorage();
   const today = new Date();
   const dateKey = toDateKey(today);
-  const phase = getCurrentPhase(today, getPhaseOverride());
+  const phase = getCurrentPhase(today, storage.getPhaseOverride());
   const week = getCurrentWeek(today);
   const isBarrysDay = phase >= 2 && today.getDay() === 3;
 
-  const [barrysAttendance] = useState(getBarrysAttendance());
-  const barrysCount = getBarrysCount();
+  const barrysAttendance = storage.getBarrysAttendance();
+  const barrysCount = storage.getBarrysCount();
   const barrysDoneToday = !!barrysAttendance[dateKey];
-  const streaks = getStreaks();
+  const streaks = storage.getStreaks();
 
   const handleBarrysCheck = useCallback(() => {
-    setBarrysAttended(dateKey);
-    addXP(XP_VALUES.barrysSession);
+    storage.setBarrysAttended(dateKey);
+    storage.addXP(XP_VALUES.barrysSession);
     onToast("Barry's session completed! 🥊 +50 XP");
-    const newBadges = checkBadges();
+    const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-  }, [dateKey, onToast, onBadgeUnlock]);
+  }, [dateKey, onToast, onBadgeUnlock, storage]);
 
   return (
     <div className="pb-4 animate-fade-in">

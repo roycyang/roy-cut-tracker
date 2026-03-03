@@ -6,11 +6,7 @@ import {
   getCurrentWeek, getCurrentPhase, getTrainingForDay, toDateKey,
   isWaterCutPeriod, isFinalWeek, getWeekTarget, formatDateShort,
 } from '../utils/dateUtils';
-import {
-  getWeightForDate, logWeight, getMealChecks, setMealCheck, addXP,
-  getPhaseOverride, getWorkoutForDate, setWorkoutForDate,
-} from '../utils/storage';
-import { getMealOverrides, setMealOverride, clearMealOverride } from '../utils/mealOverrides';
+import { useStorage } from '../hooks/useStorage';
 import { recalculateStreaks, getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
 import { playMealCheck, playAllMealsDone, playWeeklyTargetHit } from '../utils/sounds';
@@ -44,12 +40,12 @@ function CheckBox({ checked, onChange }) {
   );
 }
 
-function TimeLabel({ time }) {
-  return <span className="text-[11px] text-gray-600 w-14 flex-shrink-0 text-right mr-3">{time}</span>;
-}
-
 export default function TodayScreen({ onToast, onBadgeUnlock }) {
+  const storage = useStorage();
   const [dateOffset, setDateOffset] = useState(0);
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
+  const [editingMeal, setEditingMeal] = useState(null);
 
   const viewDate = useMemo(() => {
     const d = new Date();
@@ -60,39 +56,28 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const isToday = dateOffset === 0;
   const dateKey = toDateKey(viewDate);
   const week = getCurrentWeek(viewDate);
-  const phaseOverride = getPhaseOverride();
+  const phaseOverride = storage.getPhaseOverride();
   const phase = getCurrentPhase(viewDate, phaseOverride);
   const training = getTrainingForDay(viewDate);
   const weekTarget = getWeekTarget(week);
   const phaseConfig = PHASE_CONFIG[phase];
 
-  const [weightLogged, setWeightLogged] = useState(getWeightForDate(dateKey));
-  const [showWeightModal, setShowWeightModal] = useState(false);
-  const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
-  const [mealChecks, setMealChecksState] = useState(getMealChecks(dateKey));
-  const [overrides, setOverrides] = useState(getMealOverrides(dateKey));
-  const [editingMeal, setEditingMeal] = useState(null);
-  const [, setForceUpdate] = useState(0);
+  // Read directly from context — no local state mirroring needed
+  const weightLogged = storage.getWeightForDate(dateKey);
+  const mealChecks = storage.getMealChecks(dateKey);
+  const overrides = storage.getMealOverrides(dateKey);
+  const workoutOverride = storage.getWorkoutForDate(dateKey);
 
-  const workoutOverride = getWorkoutForDate(dateKey);
   const activeWorkout = workoutOverride || training;
   const isRestDay = activeWorkout.type === 'Rest' || activeWorkout.type === 'Active Recovery';
 
-  const refreshForDate = useCallback((key) => {
-    setWeightLogged(getWeightForDate(key));
-    setMealChecksState(getMealChecks(key));
-    setOverrides(getMealOverrides(key));
-    setShowWorkoutPicker(false);
-  }, []);
-
   const handleWorkoutSelect = (option) => {
     if (option.type === training.type) {
-      setWorkoutForDate(dateKey, null);
+      storage.setWorkoutForDate(dateKey, null);
     } else {
-      setWorkoutForDate(dateKey, option);
+      storage.setWorkoutForDate(dateKey, option);
     }
     setShowWorkoutPicker(false);
-    setForceUpdate(n => n + 1);
   };
 
   const canGoPrev = dateOffset > 0;
@@ -100,28 +85,22 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
   const goToPrev = () => {
     if (!canGoPrev) return;
-    const newOffset = dateOffset - 1;
-    setDateOffset(newOffset);
-    const d = new Date();
-    d.setDate(d.getDate() + newOffset);
-    refreshForDate(toDateKey(d));
+    setDateOffset(dateOffset - 1);
+    setShowWorkoutPicker(false);
   };
 
   const goToNext = () => {
     if (!canGoNext) return;
-    const newOffset = dateOffset + 1;
-    setDateOffset(newOffset);
-    const d = new Date();
-    d.setDate(d.getDate() + newOffset);
-    refreshForDate(toDateKey(d));
+    setDateOffset(dateOffset + 1);
+    setShowWorkoutPicker(false);
   };
 
   const goToToday = () => {
     setDateOffset(0);
-    refreshForDate(toDateKey(new Date()));
+    setShowWorkoutPicker(false);
   };
 
-  const streaks = recalculateStreaks();
+  const streaks = recalculateStreaks(storage);
   const { meals, isBarrysDay, barrysNote } = getMealsForDay(viewDate, phase);
 
   const dayOfYear = Math.floor((viewDate - new Date(viewDate.getFullYear(), 0, 0)) / 86400000);
@@ -129,9 +108,8 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const motivation = motivationList[dayOfYear % motivationList.length];
 
   const handleLogWeight = useCallback((weight) => {
-    logWeight(dateKey, weight);
-    if (isToday) addXP(XP_VALUES.logWeight);
-    setWeightLogged(weight);
+    storage.logWeight(dateKey, weight);
+    if (isToday) storage.addXP(XP_VALUES.logWeight);
     setShowWeightModal(false);
 
     if (weekTarget && weight <= weekTarget.target) {
@@ -139,7 +117,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
       const toGo = (weight - 137.5).toFixed(1);
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
       playWeeklyTargetHit();
-      if (isToday) addXP(XP_VALUES.weeklyTarget);
+      if (isToday) storage.addXP(XP_VALUES.weeklyTarget);
       onToast(`Week ${week} target crushed! 🎯 ${lostTotal} lbs down, ${toGo} to go`);
     }
 
@@ -153,22 +131,20 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
       }, 1500);
     }
 
-    const newBadges = checkBadges();
+    const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-    recalculateStreaks();
-    setForceUpdate(n => n + 1);
-  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday]);
+    recalculateStreaks(storage);
+  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday, storage]);
 
   const handleCheck = useCallback((id, checked) => {
-    setMealCheck(dateKey, id, checked);
-    const updated = { ...mealChecks, [id]: checked };
-    setMealChecksState(updated);
+    storage.setMealCheck(dateKey, id, checked);
 
     if (checked) {
-      addXP(XP_VALUES.checkMeal);
+      storage.addXP(XP_VALUES.checkMeal);
+      const updated = { ...mealChecks, [id]: checked };
       const allMealsDone = updated.meal1 && updated.meal2 && updated.meal3;
       if (allMealsDone) {
-        addXP(XP_VALUES.allMeals);
+        storage.addXP(XP_VALUES.allMeals);
         playAllMealsDone();
         onToast('All meals logged! 🍽️ +25 XP bonus');
       } else {
@@ -176,21 +152,19 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
       }
     }
 
-    const newBadges = checkBadges();
+    const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-    recalculateStreaks();
-  }, [dateKey, mealChecks, onToast, onBadgeUnlock]);
+    recalculateStreaks(storage);
+  }, [dateKey, mealChecks, onToast, onBadgeUnlock, storage]);
 
   const handleMealOverrideSave = useCallback((mealId, overrideData) => {
-    setMealOverride(dateKey, mealId, overrideData);
-    setOverrides(getMealOverrides(dateKey));
+    storage.setMealOverride(dateKey, mealId, overrideData);
     setEditingMeal(null);
-  }, [dateKey]);
+  }, [dateKey, storage]);
 
   const handleMealOverrideClear = useCallback((mealId) => {
-    clearMealOverride(dateKey, mealId);
-    setOverrides(getMealOverrides(dateKey));
-  }, [dateKey]);
+    storage.clearMealOverride(dateKey, mealId);
+  }, [dateKey, storage]);
 
   // Resolve meals: use override macros when present
   const resolvedMeals = meals.map(m => overrides[m.id] ? { ...m, ...overrides[m.id] } : m);
@@ -386,7 +360,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
           )}
         </div>
 
-        {/* 9:00am — Meal 1 (Shake with Whey + Collagen) */}
+        {/* Meals */}
         {meals.map(meal => {
           const override = overrides[meal.id];
           const display = override || meal;
