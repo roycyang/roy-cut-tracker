@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { PHASE_CONFIG, MOTIVATION, XP_VALUES, START_WEIGHT } from '../data/config';
+import { PHASE_CONFIG, MOTIVATION, XP_VALUES, START_WEIGHT, START_DATE } from '../data/config';
 import { getMealsForDay } from '../data/meals';
 import {
   getCurrentWeek, getCurrentPhase, getTrainingForDay, toDateKey,
@@ -82,7 +82,14 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
     setShowWorkoutPicker(false);
   };
 
-  const canGoPrev = dateOffset > 0;
+  const minOffset = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(START_DATE);
+    start.setHours(0, 0, 0, 0);
+    return Math.floor((start - today) / (1000 * 60 * 60 * 24));
+  }, []);
+  const canGoPrev = dateOffset > minOffset;
   const canGoNext = dateOffset < 7;
 
   const goToPrev = () => {
