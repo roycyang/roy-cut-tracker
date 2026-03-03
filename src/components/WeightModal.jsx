@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function WeightModal({ onSave, onClose, lastWeight }) {
   const [value, setValue] = useState(lastWeight ? String(lastWeight) : '');
@@ -10,7 +11,7 @@ export default function WeightModal({ onSave, onClose, lastWeight }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
         <h3 className="text-lg font-bold mb-4">Log Today's Weight</h3>
@@ -41,6 +42,7 @@ export default function WeightModal({ onSave, onClose, lastWeight }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

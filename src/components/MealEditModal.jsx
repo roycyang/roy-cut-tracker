@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 function resizeImage(file, maxSize = 1024) {
   return new Promise((resolve) => {
@@ -95,7 +96,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
 
   const canAnalyze = tab === 'text' ? text.trim().length > 0 : !!imageData;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
         className="bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto animate-slide-up"
@@ -243,6 +244,7 @@ export default function MealEditModal({ meal, onSave, onClose }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
