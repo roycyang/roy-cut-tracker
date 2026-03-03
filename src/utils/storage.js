@@ -10,6 +10,7 @@ const KEYS = {
   goalWeight: 'cut_goalWeight',
   barrys: 'cut_barrys',
   phaseTransitions: 'cut_phaseTransitions',
+  workouts: 'cut_workouts',
 };
 
 function get(key, fallback = null) {
@@ -107,6 +108,19 @@ export function markPhaseTransitionShown(phase) {
   const shown = getPhaseTransitionsShown();
   shown[phase] = true;
   set(KEYS.phaseTransitions, shown);
+}
+
+// Workout overrides per day
+export function getWorkoutOverrides() { return get(KEYS.workouts, {}); }
+export function getWorkoutForDate(dateKey) { return getWorkoutOverrides()[dateKey] || null; }
+export function setWorkoutForDate(dateKey, workout) {
+  const all = getWorkoutOverrides();
+  if (workout === null) {
+    delete all[dateKey];
+  } else {
+    all[dateKey] = workout;
+  }
+  set(KEYS.workouts, all);
 }
 
 // Export CSV

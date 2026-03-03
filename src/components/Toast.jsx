@@ -13,7 +13,8 @@ export default function Toast({ message, onDone }) {
 
   return (
     <div
-      className={`fixed top-12 left-4 right-4 z-[100] flex justify-center transition-all duration-300 ${
+      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 48px)' }}
+      className={`fixed left-4 right-4 z-[100] flex justify-center transition-all duration-300 ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
       }`}
     >

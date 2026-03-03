@@ -1,6 +1,6 @@
 export const START_DATE = new Date(2026, 2, 2); // Mar 2, 2026
 export const END_DATE = new Date(2026, 4, 10);  // May 10, 2026
-export const START_WEIGHT = 146;
+export const START_WEIGHT = 148.4;
 export const GOAL_WEIGHT_MIN = 137;
 export const GOAL_WEIGHT_MAX = 138;
 export const EATING_WINDOW = { start: '9:00am', end: '6:00pm' };

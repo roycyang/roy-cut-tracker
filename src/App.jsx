@@ -64,17 +64,11 @@ export default function App() {
 
   return (
     <>
-      {/* Sound toggle - top right */}
-      <button
-        onClick={handleSoundToggle}
-        className="fixed top-3 right-3 z-50 text-lg w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] border border-[#2a2a2a]"
-        aria-label="Toggle sound"
+      {/* Main content, top padding respects Dynamic Island safe area */}
+      <main
+        className="flex-1 overflow-y-auto px-4 pb-20 max-w-lg mx-auto w-full"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)' }}
       >
-        {soundOn ? '🔊' : '🔇'}
-      </button>
-
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto px-4 pt-4 pb-20 max-w-lg mx-auto w-full">
         {renderScreen()}
       </main>
 

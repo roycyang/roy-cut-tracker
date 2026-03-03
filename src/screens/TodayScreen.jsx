@@ -1,63 +1,130 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
-import { PHASE_CONFIG, MOTIVATION, XP_VALUES, WEEKLY_TARGETS } from '../data/config';
+import { PHASE_CONFIG, MOTIVATION, XP_VALUES, START_WEIGHT } from '../data/config';
 import { getMealsForDay } from '../data/meals';
 import {
   getCurrentWeek, getCurrentPhase, getTrainingForDay, toDateKey,
-  isWaterCutPeriod, isFinalWeek, isTrainingDay, getWeekTarget,
+  isWaterCutPeriod, isFinalWeek, isTrainingDay, getWeekTarget, formatDateShort,
 } from '../utils/dateUtils';
 import {
   getWeightForDate, logWeight, getMealChecks, setMealCheck, addXP,
-  getPhaseOverride,
+  getPhaseOverride, getWorkoutForDate, setWorkoutForDate,
 } from '../utils/storage';
 import { recalculateStreaks, getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
 import { playMealCheck, playAllMealsDone, playWeeklyTargetHit } from '../utils/sounds';
 import WeightModal from '../components/WeightModal';
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const WORKOUT_OPTIONS = [
+  { type: 'Lift', emoji: '💪' },
+  { type: 'Core', emoji: '🧘' },
+  { type: "Barry's", emoji: '🔥' },
+  { type: 'Solidcore', emoji: '🔵' },
+  { type: 'Active Recovery', emoji: '🚶' },
+  { type: 'Rest', emoji: '😴' },
+  { type: 'Other', emoji: '🏋️' },
+];
+
 export default function TodayScreen({ onToast, onBadgeUnlock }) {
-  const today = new Date();
-  const dateKey = toDateKey(today);
-  const week = getCurrentWeek(today);
+  const [dateOffset, setDateOffset] = useState(0);
+
+  const viewDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + dateOffset);
+    return d;
+  }, [dateOffset]);
+
+  const isToday = dateOffset === 0;
+  const dateKey = toDateKey(viewDate);
+  const week = getCurrentWeek(viewDate);
   const phaseOverride = getPhaseOverride();
-  const phase = getCurrentPhase(today, phaseOverride);
-  const training = getTrainingForDay(today);
+  const phase = getCurrentPhase(viewDate, phaseOverride);
+  const training = getTrainingForDay(viewDate);
   const weekTarget = getWeekTarget(week);
   const phaseConfig = PHASE_CONFIG[phase];
 
   const [weightLogged, setWeightLogged] = useState(getWeightForDate(dateKey));
   const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
   const [mealChecks, setMealChecksState] = useState(getMealChecks(dateKey));
   const [, setForceUpdate] = useState(0);
 
+  // Workout: use override if set, otherwise scheduled
+  const workoutOverride = getWorkoutForDate(dateKey);
+  const activeWorkout = workoutOverride || training;
+
+  // Re-sync state when date changes
+  const refreshForDate = useCallback((key) => {
+    setWeightLogged(getWeightForDate(key));
+    setMealChecksState(getMealChecks(key));
+    setShowWorkoutPicker(false);
+  }, []);
+
+  const handleWorkoutSelect = (option) => {
+    if (option.type === training.type) {
+      // Selecting the scheduled workout clears the override
+      setWorkoutForDate(dateKey, null);
+    } else {
+      setWorkoutForDate(dateKey, option);
+    }
+    setShowWorkoutPicker(false);
+    setForceUpdate(n => n + 1);
+  };
+
+  const canGoPrev = dateOffset > 0;
+  const canGoNext = dateOffset < 7;
+
+  const goToPrev = () => {
+    if (!canGoPrev) return;
+    const newOffset = dateOffset - 1;
+    setDateOffset(newOffset);
+    const d = new Date();
+    d.setDate(d.getDate() + newOffset);
+    refreshForDate(toDateKey(d));
+  };
+
+  const goToNext = () => {
+    if (!canGoNext) return;
+    const newOffset = dateOffset + 1;
+    setDateOffset(newOffset);
+    const d = new Date();
+    d.setDate(d.getDate() + newOffset);
+    refreshForDate(toDateKey(d));
+  };
+
+  const goToToday = () => {
+    setDateOffset(0);
+    refreshForDate(toDateKey(new Date()));
+  };
+
   const streaks = recalculateStreaks();
-  const { meals, isBarrysDay, barrysNote } = getMealsForDay(today, phase);
+  const { meals, isBarrysDay, barrysNote } = getMealsForDay(viewDate, phase);
 
   // Motivation line - pick by day
-  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 86400000);
-  const motivationList = isFinalWeek(today) ? MOTIVATION.final : MOTIVATION[phase];
+  const dayOfYear = Math.floor((viewDate - new Date(viewDate.getFullYear(), 0, 0)) / 86400000);
+  const motivationList = isFinalWeek(viewDate) ? MOTIVATION.final : MOTIVATION[phase];
   const motivation = motivationList[dayOfYear % motivationList.length];
 
   const handleLogWeight = useCallback((weight) => {
     logWeight(dateKey, weight);
-    addXP(XP_VALUES.logWeight);
+    if (isToday) addXP(XP_VALUES.logWeight);
     setWeightLogged(weight);
     setShowWeightModal(false);
 
-    // Check if hit weekly target
     if (weekTarget && weight <= weekTarget.target) {
-      const lostTotal = (146 - weight).toFixed(1);
+      const lostTotal = (START_WEIGHT - weight).toFixed(1);
       const toGo = (weight - 137.5).toFixed(1);
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
       playWeeklyTargetHit();
-      addXP(XP_VALUES.weeklyTarget);
+      if (isToday) addXP(XP_VALUES.weeklyTarget);
       onToast(`Week ${week} target crushed! 🎯 ${lostTotal} lbs down, ${toGo} to go`);
     }
 
-    // Check for final goal
     if (weight <= 137.5) {
       setTimeout(() => {
-        const totalLost = (146 - weight).toFixed(1);
+        const totalLost = (START_WEIGHT - weight).toFixed(1);
         for (let i = 0; i < 5; i++) {
           setTimeout(() => confetti({ particleCount: 100, spread: 120, origin: { y: 0.5 } }), i * 500);
         }
@@ -69,7 +136,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
     recalculateStreaks();
     setForceUpdate(n => n + 1);
-  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock]);
+  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday]);
 
   const handleMealCheck = useCallback((mealId, checked) => {
     setMealCheck(dateKey, mealId, checked);
@@ -97,14 +164,47 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const checkedMeals = meals.filter(m => mealChecks[m.id]);
   const totalCal = checkedMeals.reduce((s, m) => s + m.cal, 0);
   const totalProtein = checkedMeals.reduce((s, m) => s + m.protein, 0);
-  const totalCarbs = checkedMeals.reduce((s, m) => s + m.carbs, 0);
   const allCal = meals.reduce((s, m) => s + m.cal, 0);
   const allProtein = meals.reduce((s, m) => s + m.protein, 0);
 
-  const isRestDay = training.type === 'Rest' || training.type === 'Active Recovery';
+  const isRestDay = activeWorkout.type === 'Rest' || activeWorkout.type === 'Active Recovery';
+
+  // Format the date display
+  const dateDisplay = isToday
+    ? `Today — ${DAY_NAMES[viewDate.getDay()]}, ${formatDateShort(viewDate)}`
+    : `${DAY_NAMES[viewDate.getDay()]}, ${formatDateShort(viewDate)}`;
 
   return (
     <div className="pb-4 animate-fade-in">
+      {/* Date navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={goToPrev}
+          className={`w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] active:bg-[#333] ${
+            canGoPrev ? 'text-gray-400' : 'text-gray-700'
+          }`}
+          disabled={!canGoPrev}
+        >
+          ‹
+        </button>
+        <button
+          onClick={goToToday}
+          className="text-center"
+        >
+          <div className="text-sm font-semibold text-white">{dateDisplay}</div>
+          {!isToday && <div className="text-[10px] text-blue-400 mt-0.5">Tap to go to today</div>}
+        </button>
+        <button
+          onClick={goToNext}
+          className={`w-9 h-9 flex items-center justify-center rounded-full bg-[#1a1a1a] active:bg-[#333] ${
+            canGoNext ? 'text-gray-400' : 'text-gray-700'
+          }`}
+          disabled={!canGoNext}
+        >
+          ›
+        </button>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -116,10 +216,42 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
             {phaseConfig.label}
           </span>
         </div>
-        <span className="text-sm font-medium px-3 py-1 bg-[#1a1a1a] rounded-full">
-          {training.emoji} {training.type}
-        </span>
+        <button
+          onClick={() => setShowWorkoutPicker(!showWorkoutPicker)}
+          className={`text-sm font-medium px-3 py-1 rounded-full transition-colors ${
+            workoutOverride ? 'bg-[#2a2a2a] border border-[#444]' : 'bg-[#1a1a1a]'
+          }`}
+        >
+          {activeWorkout.emoji} {activeWorkout.type} ▾
+        </button>
       </div>
+
+      {/* Workout picker */}
+      {showWorkoutPicker && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-2 mb-3 animate-fade-in">
+          <div className="grid grid-cols-4 gap-1.5">
+            {WORKOUT_OPTIONS.map(opt => (
+              <button
+                key={opt.type}
+                onClick={() => handleWorkoutSelect(opt)}
+                className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs transition-all ${
+                  activeWorkout.type === opt.type
+                    ? 'bg-white/10 text-white font-semibold'
+                    : 'text-gray-400 active:bg-white/5'
+                }`}
+              >
+                <span className="text-lg mb-0.5">{opt.emoji}</span>
+                <span className="truncate w-full text-center">{opt.type}</span>
+              </button>
+            ))}
+          </div>
+          {workoutOverride && (
+            <p className="text-[10px] text-gray-500 text-center mt-1.5">
+              Scheduled: {training.emoji} {training.type} · Tap to reset
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Motivation */}
       <p className="text-gray-400 text-sm italic mb-4">"{motivation}"</p>
@@ -132,7 +264,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
       )}
 
       {/* Banners */}
-      {isWaterCutPeriod(today) && (
+      {isWaterCutPeriod(viewDate) && (
         <div className="bg-purple-900/30 border border-purple-700/50 rounded-xl px-4 py-3 mb-4 text-sm">
           🧂 Water cut active — no added sodium, 1 gallon water/day
         </div>
@@ -173,7 +305,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
             onClick={() => setShowWeightModal(true)}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-xl font-semibold text-white transition-colors"
           >
-            Log Today's Weight
+            Log {isToday ? "Today's" : "This Day's"} Weight
           </button>
         ) : (
           <div className="flex items-center gap-2">
@@ -217,7 +349,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
                     <span className="text-xs text-gray-500">{meal.time}</span>
                     <span className="font-semibold text-sm">{meal.name}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2">{meal.ingredients}</p>
+                  {meal.ingredients && <p className="text-xs text-gray-400 mb-2">{meal.ingredients}</p>}
                   <div className="flex gap-2">
                     <span className="text-xs px-2 py-0.5 bg-orange-900/30 text-orange-400 rounded-full">{meal.cal} cal</span>
                     <span className="text-xs px-2 py-0.5 bg-blue-900/30 text-blue-400 rounded-full">{meal.protein}g P</span>
