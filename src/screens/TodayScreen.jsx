@@ -190,6 +190,12 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const allCal = resolvedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
   const allProtein = resolvedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
 
+  // Parse phase targets for progress bars
+  const calNums = phaseConfig.calRange.replace(/,/g, '').match(/\d+/g)?.map(Number) || [1500, 1650];
+  const calTarget = calNums[1]; // upper end of range
+  const calMin = calNums[0];
+  const proteinTarget = parseInt(phaseConfig.protein) || 130;
+
   const dateDisplay = isToday
     ? `Today — ${DAY_NAMES[viewDate.getDay()]}, ${formatDateShort(viewDate)}`
     : `${DAY_NAMES[viewDate.getDay()]}, ${formatDateShort(viewDate)}`;
@@ -460,12 +466,37 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
         </button>
       </div>
 
-      {/* Macro totals bar */}
-      <div className="bg-[#111] rounded-xl p-3 mt-2 mb-4 flex items-center justify-between text-xs">
-        <span className="text-gray-500">Meal Totals:</span>
-        <div className="flex gap-3">
-          <span className="text-orange-400 font-semibold">{totalCal}/{allCal} cal</span>
-          <span className="text-blue-400 font-semibold">{totalProtein}/{allProtein}g P</span>
+      {/* Macro progress bars */}
+      <div className="bg-[#111] rounded-xl p-4 mt-2 mb-4 space-y-3">
+        {/* Calories */}
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-gray-500">Calories</span>
+            <span className={`font-semibold ${totalCal > calTarget ? 'text-red-400' : 'text-orange-400'}`}>
+              {totalCal} <span className="text-gray-600">/ {calMin}–{calTarget}</span>
+            </span>
+          </div>
+          <div className="h-2.5 bg-[#222] rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${totalCal > calTarget ? 'bg-red-500' : 'bg-orange-500'}`}
+              style={{ width: `${Math.min((totalCal / calTarget) * 100, 100)}%` }}
+            />
+          </div>
+        </div>
+        {/* Protein */}
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-gray-500">Protein</span>
+            <span className={`font-semibold ${totalProtein >= proteinTarget ? 'text-green-400' : 'text-blue-400'}`}>
+              {totalProtein}g <span className="text-gray-600">/ {proteinTarget}g+</span>
+            </span>
+          </div>
+          <div className="h-2.5 bg-[#222] rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${totalProtein >= proteinTarget ? 'bg-green-500' : 'bg-blue-500'}`}
+              style={{ width: `${Math.min((totalProtein / proteinTarget) * 100, 100)}%` }}
+            />
+          </div>
         </div>
       </div>
 
