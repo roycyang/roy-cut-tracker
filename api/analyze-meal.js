@@ -1,6 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
-const client = new Anthropic();
+const client = new OpenAI();
 
 const SYSTEM_PROMPT = `You are a nutritionist AI. Given a meal description (text or photo), estimate its macros.
 
@@ -29,11 +29,9 @@ export default async function handler(req, res) {
 
   if (type === 'image') {
     userContent.push({
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: imageMimeType || 'image/jpeg',
-        data: imageBase64,
+      type: 'image_url',
+      image_url: {
+        url: `data:${imageMimeType || 'image/jpeg'};base64,${imageBase64}`,
       },
     });
     userContent.push({
@@ -48,21 +46,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4.1',
       max_tokens: 256,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userContent }],
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userContent },
+      ],
     });
 
-    const raw = message.content[0].text.trim();
+    const raw = completion.choices[0].message.content.trim();
     const result = JSON.parse(raw);
 
     return res.status(200).json(result);
   } catch (err) {
     console.error('Meal analysis error:', err);
     const detail = err?.status
-      ? `Anthropic API ${err.status}: ${err.message}`
+      ? `OpenAI API ${err.status}: ${err.message}`
       : err?.message || 'Unknown error';
     return res.status(500).json({ error: detail });
   }
