@@ -507,15 +507,6 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
             />
           </div>
         </div>
-        {/* Carbs & Fat */}
-        <div className="flex gap-4 pt-1">
-          <span className="text-xs text-gray-500">
-            Carbs: <span className="text-green-400 font-semibold">{totalCarbs}g</span> / ~{carbsTarget}g
-          </span>
-          <span className="text-xs text-gray-500">
-            Fat: <span className="text-yellow-400 font-semibold">{totalFat}g</span> / ~{fatTarget || '—'}g
-          </span>
-        </div>
       </div>
 
       {showWeightModal && (

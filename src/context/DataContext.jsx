@@ -58,8 +58,12 @@ export function DataProvider({ children }) {
         await supabase.from('user_state').upsert(DEFAULT_USER_STATE);
       }
 
-      // Cache to localStorage as offline fallback
-      localStorage.setItem('sb_daily_logs', JSON.stringify(logsMap));
+      // Cache to localStorage as offline fallback (strip photos to save space)
+      try {
+        localStorage.setItem('sb_daily_logs', JSON.stringify(logsMap, (key, value) =>
+          key === 'photo' ? undefined : value
+        ));
+      } catch { /* localStorage full */ }
       localStorage.setItem('sb_user_state', JSON.stringify(stateRes.data || DEFAULT_USER_STATE));
     } catch (err) {
       console.warn('Supabase load failed, using localStorage fallback', err);
@@ -81,8 +85,14 @@ export function DataProvider({ children }) {
       const next = { ...current, ...updates, date_key: dateKey, updated_at: new Date().toISOString() };
       const newMap = { ...prev, [dateKey]: next };
 
-      // Cache to localStorage
-      localStorage.setItem('sb_daily_logs', JSON.stringify(newMap));
+      // Cache to localStorage (strip photos to avoid QuotaExceededError)
+      try {
+        localStorage.setItem('sb_daily_logs', JSON.stringify(newMap, (key, value) =>
+          key === 'photo' ? undefined : value
+        ));
+      } catch {
+        // localStorage full — Supabase is the source of truth anyway
+      }
 
       // Fire and forget Supabase upsert
       supabase.from('daily_logs').upsert(next).then(({ error }) => {
@@ -109,7 +119,11 @@ export function DataProvider({ children }) {
       setDailyLogs(logsMap);
       if (stateRes.data) setUserState(stateRes.data);
 
-      localStorage.setItem('sb_daily_logs', JSON.stringify(logsMap));
+      try {
+        localStorage.setItem('sb_daily_logs', JSON.stringify(logsMap, (key, value) =>
+          key === 'photo' ? undefined : value
+        ));
+      } catch { /* localStorage full */ }
       localStorage.setItem('sb_user_state', JSON.stringify(stateRes.data || userStateRef.current));
     } catch (err) {
       console.warn('Refresh failed:', err);
