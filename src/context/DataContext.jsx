@@ -13,6 +13,7 @@ const DEFAULT_USER_STATE = {
 
 export function DataProvider({ children }) {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dailyLogs, setDailyLogs] = useState({});
   const [userState, setUserState] = useState(DEFAULT_USER_STATE);
 
@@ -27,6 +28,15 @@ export function DataProvider({ children }) {
   }, []);
 
   async function loadInitialData() {
+    // Version-based hard refresh: detect new deploys
+    const storedBuild = localStorage.getItem('app_build_id');
+    if (storedBuild && storedBuild !== __BUILD_ID__) {
+      localStorage.setItem('app_build_id', __BUILD_ID__);
+      window.location.reload();
+      return;
+    }
+    localStorage.setItem('app_build_id', __BUILD_ID__);
+
     try {
       const [logsRes, stateRes] = await Promise.all([
         supabase.from('daily_logs').select('*'),
@@ -83,6 +93,30 @@ export function DataProvider({ children }) {
     });
   }, []);
 
+  const refreshData = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [logsRes, stateRes] = await Promise.all([
+        supabase.from('daily_logs').select('*'),
+        supabase.from('user_state').select('*').eq('id', 'roy').single(),
+      ]);
+      if (logsRes.error) throw logsRes.error;
+
+      const logsMap = {};
+      for (const row of logsRes.data) {
+        logsMap[row.date_key] = row;
+      }
+      setDailyLogs(logsMap);
+      if (stateRes.data) setUserState(stateRes.data);
+
+      localStorage.setItem('sb_daily_logs', JSON.stringify(logsMap));
+      localStorage.setItem('sb_user_state', JSON.stringify(stateRes.data || userStateRef.current));
+    } catch (err) {
+      console.warn('Refresh failed:', err);
+    }
+    setRefreshing(false);
+  }, []);
+
   const updateUserState = useCallback((updates) => {
     setUserState(prev => {
       const next = { ...prev, ...updates, id: 'roy', updated_at: new Date().toISOString() };
@@ -100,7 +134,7 @@ export function DataProvider({ children }) {
   }, []);
 
   return (
-    <DataContext.Provider value={{ loading, dailyLogs, userState, upsertDailyLog, updateUserState }}>
+    <DataContext.Provider value={{ loading, refreshing, refreshData, dailyLogs, userState, upsertDailyLog, updateUserState }}>
       {children}
     </DataContext.Provider>
   );
