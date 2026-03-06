@@ -102,6 +102,11 @@ export function useStorage() {
     return Object.values(dailyLogs).filter(l => l.barrys).length;
   }, [dailyLogs]);
 
+  // ── Solidcore ──
+  const getSolidcoreCount = useCallback(() => {
+    return Object.values(dailyLogs).filter(l => l.workout?.type === 'Solidcore').length;
+  }, [dailyLogs]);
+
   // ── Badges ──
   const getBadges = useCallback(() => userState.badges || {}, [userState]);
 
@@ -192,6 +197,7 @@ export function useStorage() {
     getExtraMeals, addExtraMeal, removeExtraMeal,
     getWorkoutForDate, setWorkoutForDate,
     getBarrysAttendance, setBarrysAttended, getBarrysCount,
+    getSolidcoreCount,
     getBadges, unlockBadge,
     getXP, addXP,
     getStreaks, setStreaks,

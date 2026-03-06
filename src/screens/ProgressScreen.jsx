@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, Cell } from 'recharts';
 import { WEEKLY_TARGETS, PHASE_CONFIG, START_WEIGHT, START_DATE } from '../data/config';
-import { getCurrentWeek, getCurrentPhase, formatDateRange, getWeekDateRange, toDateKey } from '../utils/dateUtils';
+import { getCurrentWeek, getCurrentPhase, formatDateRange, getWeekDateRange, toDateKey, getTrainingForDay } from '../utils/dateUtils';
 import { getMealsForDay } from '../data/meals';
 import { useStorage } from '../hooks/useStorage';
 import { useData } from '../context/DataContext';
@@ -16,6 +16,7 @@ export default function ProgressScreen() {
   const currentWeek = getCurrentWeek(today);
   const weights = getWeights();
   const xp = getXP();
+  const [expandedWeek, setExpandedWeek] = useState(null);
 
   // Build chart data
   const chartData = WEEKLY_TARGETS.map(wt => {
@@ -82,6 +83,7 @@ export default function ProgressScreen() {
           const isCurrent = wt.week === currentWeek;
           const isFuture = wt.week > currentWeek;
           const phaseConfig = PHASE_CONFIG[wt.phase];
+          const isExpanded = expandedWeek === wt.week;
 
           return (
             <div
@@ -91,9 +93,11 @@ export default function ProgressScreen() {
                 : isCurrent ? 'border-[#333]'
                 : 'border-transparent'
               } ${isFuture ? 'opacity-40' : ''}`}
+              onClick={() => setExpandedWeek(isExpanded ? null : wt.week)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{isExpanded ? '▾' : '▸'}</span>
                   <span className="font-bold text-sm">Week {wt.week}</span>
                   <span
                     className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
@@ -121,6 +125,36 @@ export default function ProgressScreen() {
                 <span className="text-xs text-gray-500">{formatDateRange(start, end)}</span>
                 <span className="text-xs text-gray-500">Target: {wt.target}</span>
               </div>
+              {isExpanded && (
+                <div className="mt-3 pt-2 border-t border-[#2a2a2a] space-y-1.5">
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const dayDate = new Date(start);
+                    dayDate.setDate(dayDate.getDate() + i);
+                    const dateKey = toDateKey(dayDate);
+                    const dayLog = dailyLogs[dateKey];
+                    const workout = dayLog?.workout || getTrainingForDay(dayDate);
+                    const dayWeight = dayLog?.weight;
+                    const isFutureDay = dayDate > today;
+                    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between text-xs ${isFutureDay ? 'opacity-30' : ''}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-500 w-7">{dayNames[dayDate.getDay()]}</span>
+                          <span>{workout.emoji}</span>
+                          <span className="text-gray-300">{workout.type}</span>
+                        </div>
+                        {dayWeight != null && (
+                          <span className="text-gray-400">{dayWeight} lbs</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}

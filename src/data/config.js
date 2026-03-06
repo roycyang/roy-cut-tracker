@@ -97,6 +97,8 @@ export const BADGES = [
   { id: 'barrys_beast', name: "Barry's Beast", emoji: '🥊', description: "Complete all 4 Barry's sessions" },
   { id: 'full_send', name: 'Full Send', emoji: '💯', description: "Barry's + all meals + all supps same day" },
   { id: 'shredded', name: 'Shredded', emoji: '🏆', description: 'Hit final goal weight (≤137.5)' },
+  { id: 'solidcore_10', name: 'Solidcore 10', emoji: '🔵', description: 'Complete 10 Solidcore sessions' },
+  { id: 'solidcore_20', name: 'Solidcore 20', emoji: '💎', description: 'Complete 20 Solidcore sessions' },
   { id: 'the_full_cut', name: 'The Full Cut', emoji: '🎖️', description: 'Complete all 10 weeks' },
 ];
 

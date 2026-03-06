@@ -3,7 +3,7 @@ import { getCurrentWeek, toDateKey } from './dateUtils';
 import { computeStreaks } from './streaks';
 
 export function checkBadges(storage) {
-  const { getWeights, getBadges, unlockBadge, addXP, getBarrysCount, getMealChecks, getSuppChecks, getBarrysAttendance } = storage;
+  const { getWeights, getBadges, unlockBadge, addXP, getBarrysCount, getSolidcoreCount, getMealChecks, getSuppChecks, getBarrysAttendance } = storage;
   const newlyUnlocked = [];
   const today = new Date();
   const week = getCurrentWeek(today);
@@ -73,8 +73,7 @@ export function checkBadges(storage) {
       if (wt.week > week) break;
       const weekWeights = getWeightsForWeek(wt.week, weights);
       if (weekWeights.length > 0) {
-        const avg = weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length;
-        if (avg <= wt.target) {
+        if (Math.min(...weekWeights) <= wt.target) {
           if (unlockBadge('on_target')) {
             addXP(XP_VALUES.badgeUnlocked);
             newlyUnlocked.push('on_target');
@@ -92,8 +91,7 @@ export function checkBadges(storage) {
       if (wt.week > week) break;
       const weekWeights = getWeightsForWeek(wt.week, weights);
       if (weekWeights.length > 0) {
-        const avg = weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length;
-        consecutive = avg <= wt.target ? consecutive + 1 : 0;
+        consecutive = Math.min(...weekWeights) <= wt.target ? consecutive + 1 : 0;
         if (consecutive >= 5) {
           if (unlockBadge('five_for_five')) {
             addXP(XP_VALUES.badgeUnlocked);
@@ -112,6 +110,22 @@ export function checkBadges(storage) {
     if (unlockBadge('barrys_beast')) {
       addXP(XP_VALUES.badgeUnlocked);
       newlyUnlocked.push('barrys_beast');
+    }
+  }
+
+  // Solidcore 10
+  if (getSolidcoreCount() >= 10 && !badges.solidcore_10) {
+    if (unlockBadge('solidcore_10')) {
+      addXP(XP_VALUES.badgeUnlocked);
+      newlyUnlocked.push('solidcore_10');
+    }
+  }
+
+  // Solidcore 20
+  if (getSolidcoreCount() >= 20 && !badges.solidcore_20) {
+    if (unlockBadge('solidcore_20')) {
+      addXP(XP_VALUES.badgeUnlocked);
+      newlyUnlocked.push('solidcore_20');
     }
   }
 
