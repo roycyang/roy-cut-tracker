@@ -1,11 +1,17 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { WEEKLY_TARGETS, PHASE_CONFIG, START_WEIGHT } from '../data/config';
-import { getCurrentWeek, formatDateRange, getWeekDateRange } from '../utils/dateUtils';
+import { useMemo } from 'react';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, Cell } from 'recharts';
+import { WEEKLY_TARGETS, PHASE_CONFIG, START_WEIGHT, START_DATE } from '../data/config';
+import { getCurrentWeek, getCurrentPhase, formatDateRange, getWeekDateRange, toDateKey } from '../utils/dateUtils';
+import { getMealsForDay } from '../data/meals';
 import { useStorage } from '../hooks/useStorage';
+import { useData } from '../context/DataContext';
 import { getWeightsForWeek } from '../utils/badges';
+
+const PHASE_COLORS = { 1: '#2563eb', 2: '#dc2626', 3: '#7c3aed' };
 
 export default function ProgressScreen() {
   const { getWeights, getXP } = useStorage();
+  const { dailyLogs } = useData();
   const today = new Date();
   const currentWeek = getCurrentWeek(today);
   const weights = getWeights();
@@ -14,13 +20,13 @@ export default function ProgressScreen() {
   // Build chart data
   const chartData = WEEKLY_TARGETS.map(wt => {
     const weekWeights = getWeightsForWeek(wt.week, weights);
-    const avg = weekWeights.length > 0
-      ? parseFloat((weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length).toFixed(1))
+    const lowest = weekWeights.length > 0
+      ? parseFloat(Math.min(...weekWeights).toFixed(1))
       : null;
     return {
       name: `W${wt.week}`,
       target: wt.target,
-      actual: avg,
+      actual: lowest,
       week: wt.week,
     };
   });
@@ -69,10 +75,10 @@ export default function ProgressScreen() {
         {WEEKLY_TARGETS.map(wt => {
           const { start, end } = getWeekDateRange(wt.week);
           const weekWeights = getWeightsForWeek(wt.week, weights);
-          const avg = weekWeights.length > 0
-            ? (weekWeights.reduce((a, b) => a + b, 0) / weekWeights.length).toFixed(1)
+          const lowest = weekWeights.length > 0
+            ? Math.min(...weekWeights).toFixed(1)
             : null;
-          const hitTarget = avg !== null && parseFloat(avg) <= wt.target;
+          const hitTarget = lowest !== null && parseFloat(lowest) <= wt.target;
           const isCurrent = wt.week === currentWeek;
           const isFuture = wt.week > currentWeek;
           const phaseConfig = PHASE_CONFIG[wt.phase];
@@ -102,9 +108,9 @@ export default function ProgressScreen() {
                   )}
                 </div>
                 <div className="text-right">
-                  {avg !== null ? (
+                  {lowest !== null ? (
                     <span className={`font-bold text-sm ${hitTarget ? 'text-green-400' : 'text-white'}`}>
-                      {avg} lbs {hitTarget && '✓'}
+                      {lowest} lbs {hitTarget && '✓'}
                     </span>
                   ) : (
                     <span className="text-gray-600 text-sm">—</span>
@@ -120,10 +126,98 @@ export default function ProgressScreen() {
         })}
       </div>
 
+      {/* Calorie Bar Chart */}
+      <CalorieChart dailyLogs={dailyLogs} />
+
       {/* Total XP */}
       <div className="bg-[#1a1a1a] rounded-xl p-4 text-center">
         <div className="text-3xl font-bold text-yellow-400">{xp.toLocaleString()}</div>
         <div className="text-sm text-gray-400 mt-1">Total Discipline Points</div>
+      </div>
+    </div>
+  );
+}
+
+function CalorieChart({ dailyLogs }) {
+  const data = useMemo(() => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const result = [];
+    const d = new Date(START_DATE);
+
+    while (d <= today) {
+      const dateKey = toDateKey(d);
+      const log = dailyLogs[dateKey];
+      const phase = getCurrentPhase(d);
+      const { meals } = getMealsForDay(d, phase);
+      const mealChecks = log?.meals || {};
+      const overrides = log?.meal_overrides || {};
+      const extraMeals = log?.extra_meals || [];
+
+      let cal = 0;
+      for (const m of meals) {
+        if (mealChecks[m.id]) {
+          const resolved = overrides[m.id] ? { ...m, ...overrides[m.id] } : m;
+          cal += resolved.cal;
+        }
+      }
+      for (const em of extraMeals) {
+        cal += em.cal || 0;
+      }
+
+      if (cal > 0) {
+        result.push({
+          date: `${d.getMonth() + 1}/${d.getDate()}`,
+          cal,
+          phase,
+        });
+      }
+
+      d.setDate(d.getDate() + 1);
+    }
+    return result;
+  }, [dailyLogs]);
+
+  if (data.length === 0) return null;
+
+  // Calorie target range from phase config (use phase 1 as default band)
+  const calMin = 1200;
+  const calMax = 1650;
+
+  return (
+    <div className="bg-[#1a1a1a] rounded-xl p-4 mb-4">
+      <h3 className="text-sm font-semibold text-gray-400 mb-3">Daily Calories</h3>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+          <XAxis dataKey="date" tick={{ fill: '#666', fontSize: 10 }} interval={Math.max(0, Math.floor(data.length / 8))} />
+          <YAxis domain={[0, 'dataMax + 200']} tick={{ fill: '#666', fontSize: 11 }} />
+          <Tooltip
+            contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+            labelStyle={{ color: '#999' }}
+            formatter={(value) => [`${value} cal`, 'Calories']}
+          />
+          <ReferenceArea y1={calMin} y2={calMax} fill="#22c55e" fillOpacity={0.08} />
+          <Bar dataKey="cal" name="Calories" radius={[2, 2, 0, 0]} maxBarSize={16}>
+            {data.map((entry, i) => (
+              <Cell key={i} fill={PHASE_COLORS[entry.phase] || '#2563eb'} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="flex items-center justify-center gap-4 mt-2">
+        <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="w-2 h-2 rounded-full bg-[#2563eb]" /> P1
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="w-2 h-2 rounded-full bg-[#dc2626]" /> P2
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="w-2 h-2 rounded-full bg-[#7c3aed]" /> P3
+        </span>
+        <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="w-2 h-2 rounded-sm bg-green-500/20 border border-green-500/30" /> Target
+        </span>
       </div>
     </div>
   );

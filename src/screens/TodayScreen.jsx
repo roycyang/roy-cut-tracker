@@ -170,8 +170,11 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
   const handleMealOverrideSave = useCallback((mealId, overrideData) => {
     storage.setMealOverride(dateKey, mealId, overrideData);
+    if (!mealChecks[mealId]) {
+      handleCheck(mealId, true);
+    }
     setEditingMeal(null);
-  }, [dateKey, storage]);
+  }, [dateKey, storage, mealChecks, handleCheck]);
 
   const handleMealOverrideClear = useCallback((mealId) => {
     storage.clearMealOverride(dateKey, mealId);
@@ -185,10 +188,16 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const checkedMeals = resolvedMeals.filter(m => mealChecks[m.id]);
   const extraCal = extraMeals.reduce((s, m) => s + m.cal, 0);
   const extraProtein = extraMeals.reduce((s, m) => s + m.protein, 0);
+  const extraCarbs = extraMeals.reduce((s, m) => s + (m.carbs || 0), 0);
+  const extraFat = extraMeals.reduce((s, m) => s + (m.fat || 0), 0);
   const totalCal = checkedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
   const totalProtein = checkedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
+  const totalCarbs = checkedMeals.reduce((s, m) => s + (m.carbs || 0), 0) + extraCarbs;
+  const totalFat = checkedMeals.reduce((s, m) => s + (m.fat || 0), 0) + extraFat;
   const allCal = resolvedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
   const allProtein = resolvedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
+  const carbsTarget = meals.reduce((s, m) => s + (m.carbs || 0), 0);
+  const fatTarget = meals.reduce((s, m) => s + (m.fat || 0), 0);
 
   // Parse phase targets for progress bars
   const calNums = phaseConfig.calRange.replace(/,/g, '').match(/\d+/g)?.map(Number) || [1500, 1650];
@@ -497,6 +506,15 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
               style={{ width: `${Math.min((totalProtein / proteinTarget) * 100, 100)}%` }}
             />
           </div>
+        </div>
+        {/* Carbs & Fat */}
+        <div className="flex gap-4 pt-1">
+          <span className="text-xs text-gray-500">
+            Carbs: <span className="text-green-400 font-semibold">{totalCarbs}g</span> / ~{carbsTarget}g
+          </span>
+          <span className="text-xs text-gray-500">
+            Fat: <span className="text-yellow-400 font-semibold">{totalFat}g</span> / ~{fatTarget || '—'}g
+          </span>
         </div>
       </div>
 
