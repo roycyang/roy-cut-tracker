@@ -85,7 +85,7 @@ export const MOTIVATION = {
 };
 
 export const BADGES = [
-  { id: 'first_blood', name: 'First Blood', emoji: '🩸', description: 'Log weight on Day 1' },
+  { id: 'first_blood', name: 'First Weigh In', emoji: '🩸', description: 'Log weight on Day 1' },
   { id: 'week1_warrior', name: 'Week 1 Warrior', emoji: '⚔️', description: 'Complete Week 1' },
   { id: 'halfway', name: 'Halfway There', emoji: '🧗', description: 'Complete Week 5' },
   { id: 'phase_shifter', name: 'Phase Shifter', emoji: '⚡', description: 'Enter Phase 2' },
