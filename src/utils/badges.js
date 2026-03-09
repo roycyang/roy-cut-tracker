@@ -2,101 +2,105 @@ import { BADGES, XP_VALUES, WEEKLY_TARGETS } from '../data/config';
 import { getCurrentWeek, toDateKey } from './dateUtils';
 import { computeStreaks } from './streaks';
 
-export function checkBadges(storage) {
-  const { getWeights, getBadges, unlockBadge, addXP, getBarrysCount, getSolidcoreCount, getMealChecks, getSuppChecks, getBarrysAttendance } = storage;
+/**
+ * Dynamic badge evaluation engine.
+ * When a plan is provided, uses plan-defined badges and targets.
+ * Falls back to hardcoded config for legacy mode.
+ */
+export function checkBadges(storage, plan = null) {
+  const { getWeights, getBadges, unlockBadge, addXP, getBarrysCount, getSolidcoreCount } = storage;
   const newlyUnlocked = [];
   const today = new Date();
-  const week = getCurrentWeek(today);
+  const week = getCurrentWeek(today, plan);
   const weights = getWeights();
   const streaks = computeStreaks(storage);
   const badges = getBadges();
+  const xpValues = plan?.xp_values ?? XP_VALUES;
+  const weeklyTargets = plan?.weekly_targets ?? WEEKLY_TARGETS;
+  const totalWeeks = plan?.total_weeks ?? weeklyTargets.length;
+  const goalWeight = plan
+    ? (plan.goal_weight_min + plan.goal_weight_max) / 2
+    : 137.5;
 
-  // First Blood: log weight on Day 1
-  if (weights['2026-03-02'] && !badges.first_blood) {
-    if (unlockBadge('first_blood')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('first_blood');
+  function tryUnlock(badgeId) {
+    if (badges[badgeId]) return false;
+    if (unlockBadge(badgeId)) {
+      addXP(xpValues.badgeUnlocked);
+      newlyUnlocked.push(badgeId);
+      return true;
     }
+    return false;
   }
 
-  // Week 1 Warrior
-  if (week >= 2 && !badges.week1_warrior) {
-    if (unlockBadge('week1_warrior')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('week1_warrior');
-    }
-  }
-
-  // Halfway There
-  if (week >= 6 && !badges.halfway) {
-    if (unlockBadge('halfway')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('halfway');
-    }
-  }
-
-  // Phase Shifter
-  if (today >= new Date(2026, 3, 13) && !badges.phase_shifter) {
-    if (unlockBadge('phase_shifter')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('phase_shifter');
-    }
-  }
-
-  // Red Zone
-  if (today >= new Date(2026, 3, 20) && !badges.red_zone) {
-    if (unlockBadge('red_zone')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('red_zone');
-    }
-  }
-
-  // Iron Will: 7-day meal streak
-  if (streaks.meals >= 7 && !badges.iron_will) {
-    if (unlockBadge('iron_will')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('iron_will');
-    }
-  }
-
-  // Supplement King: 14-day supplement streak
-  if (streaks.supplements >= 14 && !badges.supplement_king) {
-    if (unlockBadge('supplement_king')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('supplement_king');
-    }
-  }
-
-  // On Target
-  if (!badges.on_target) {
-    for (const wt of WEEKLY_TARGETS) {
-      if (wt.week > week) break;
-      const weekWeights = getWeightsForWeek(wt.week, weights);
-      if (weekWeights.length > 0) {
-        if (Math.min(...weekWeights) <= wt.target) {
-          if (unlockBadge('on_target')) {
-            addXP(XP_VALUES.badgeUnlocked);
-            newlyUnlocked.push('on_target');
-          }
+  // First Blood: any weight logged in week 1
+  if (!badges.first_blood) {
+    const week1Target = weeklyTargets.find(w => w.week === 1);
+    if (week1Target) {
+      // Check if any weight exists during week 1
+      const startDate = new Date(week1Target.startDate);
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(startDate);
+        d.setDate(d.getDate() + i);
+        const key = toDateKey(d);
+        if (weights[key] != null) {
+          tryUnlock('first_blood');
           break;
         }
       }
     }
   }
 
-  // 5 for 5
+  // Week 1 Warrior: complete week 1
+  if (week >= 2) tryUnlock('week1_warrior');
+
+  // Halfway: complete the midpoint week
+  const midpoint = Math.ceil(totalWeeks / 2);
+  if (week >= midpoint + 1) tryUnlock('halfway');
+
+  // Phase Shifter: enter phase 2
+  if (!badges.phase_shifter) {
+    const phase2Week = weeklyTargets.find(w => w.phase === 2);
+    if (phase2Week && week >= phase2Week.week) {
+      tryUnlock('phase_shifter');
+    }
+  }
+
+  // Red Zone: enter phase 3
+  if (!badges.red_zone) {
+    const phase3Week = weeklyTargets.find(w => w.phase === 3);
+    if (phase3Week && week >= phase3Week.week) {
+      tryUnlock('red_zone');
+    }
+  }
+
+  // Iron Will: 7-day meal streak
+  if (streaks.meals >= 7) tryUnlock('iron_will');
+
+  // Supplement King: 14-day supplement streak
+  if (streaks.supplements >= 14) tryUnlock('supplement_king');
+
+  // On Target: hit any weekly weight target
+  if (!badges.on_target) {
+    for (const wt of weeklyTargets) {
+      if (wt.week > week) break;
+      const weekWeights = getWeightsForWeek(wt.week, weights, weeklyTargets);
+      if (weekWeights.length > 0 && Math.min(...weekWeights) <= wt.target) {
+        tryUnlock('on_target');
+        break;
+      }
+    }
+  }
+
+  // 5 for 5: hit 5 consecutive weekly targets
   if (!badges.five_for_five) {
     let consecutive = 0;
-    for (const wt of WEEKLY_TARGETS) {
+    for (const wt of weeklyTargets) {
       if (wt.week > week) break;
-      const weekWeights = getWeightsForWeek(wt.week, weights);
+      const weekWeights = getWeightsForWeek(wt.week, weights, weeklyTargets);
       if (weekWeights.length > 0) {
         consecutive = Math.min(...weekWeights) <= wt.target ? consecutive + 1 : 0;
         if (consecutive >= 5) {
-          if (unlockBadge('five_for_five')) {
-            addXP(XP_VALUES.badgeUnlocked);
-            newlyUnlocked.push('five_for_five');
-          }
+          tryUnlock('five_for_five');
           break;
         }
       } else {
@@ -106,44 +110,32 @@ export function checkBadges(storage) {
   }
 
   // Barry's Beast
-  if (getBarrysCount() >= 4 && !badges.barrys_beast) {
-    if (unlockBadge('barrys_beast')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('barrys_beast');
-    }
-  }
+  if (getBarrysCount() >= 4) tryUnlock('barrys_beast');
 
-  // Solidcore 10
-  if (getSolidcoreCount() >= 10 && !badges.solidcore_10) {
-    if (unlockBadge('solidcore_10')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('solidcore_10');
-    }
-  }
+  // Solidcore 10 & 20
+  const solidcore = getSolidcoreCount();
+  if (solidcore >= 10) tryUnlock('solidcore_10');
+  if (solidcore >= 20) tryUnlock('solidcore_20');
 
-  // Solidcore 20
-  if (getSolidcoreCount() >= 20 && !badges.solidcore_20) {
-    if (unlockBadge('solidcore_20')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('solidcore_20');
-    }
-  }
-
-  // Shredded
+  // Shredded: hit goal weight
   if (!badges.shredded) {
-    if (Object.values(weights).some(w => w <= 137.5)) {
-      if (unlockBadge('shredded')) {
-        addXP(XP_VALUES.badgeUnlocked + XP_VALUES.finalGoal);
+    if (Object.values(weights).some(w => w <= goalWeight)) {
+      if (!badges.shredded && unlockBadge('shredded')) {
+        addXP(xpValues.badgeUnlocked + xpValues.finalGoal);
         newlyUnlocked.push('shredded');
       }
     }
   }
 
-  // The Full Cut
-  if (today >= new Date(2026, 4, 10) && !badges.the_full_cut) {
-    if (unlockBadge('the_full_cut')) {
-      addXP(XP_VALUES.badgeUnlocked);
-      newlyUnlocked.push('the_full_cut');
+  // The Full Cut: complete all weeks
+  if (!badges.the_full_cut) {
+    const lastWeek = weeklyTargets[weeklyTargets.length - 1];
+    if (lastWeek) {
+      const endDate = new Date(lastWeek.startDate);
+      endDate.setDate(endDate.getDate() + 6);
+      if (today >= endDate) {
+        tryUnlock('the_full_cut');
+      }
     }
   }
 
@@ -172,8 +164,11 @@ export function checkFullSend(dateKey, storage) {
   return false;
 }
 
-export function getWeightsForWeek(weekNum, weights) {
-  const startDate = new Date(WEEKLY_TARGETS[weekNum - 1].startDate);
+export function getWeightsForWeek(weekNum, weights, weeklyTargets = null) {
+  const targets = weeklyTargets ?? WEEKLY_TARGETS;
+  const weekTarget = targets[weekNum - 1];
+  if (!weekTarget) return [];
+  const startDate = new Date(weekTarget.startDate);
   const result = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(startDate);
@@ -184,6 +179,7 @@ export function getWeightsForWeek(weekNum, weights) {
   return result;
 }
 
-export function getBadgeInfo(badgeId) {
-  return BADGES.find(b => b.id === badgeId);
+export function getBadgeInfo(badgeId, plan = null) {
+  const badgeList = plan?.badges ?? BADGES;
+  return badgeList.find(b => b.id === badgeId);
 }

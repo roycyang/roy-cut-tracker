@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea, Cell } from 'recharts';
-import { WEEKLY_TARGETS, PHASE_CONFIG, START_WEIGHT, START_DATE } from '../data/config';
+import { usePlan } from '../context/UserPlanContext';
 import { getCurrentWeek, getCurrentPhase, formatDateRange, getWeekDateRange, toDateKey, getTrainingForDay } from '../utils/dateUtils';
 import { getMealsForDay } from '../data/meals';
 import { useStorage } from '../hooks/useStorage';
@@ -12,14 +12,15 @@ const PHASE_COLORS = { 1: '#2563eb', 2: '#dc2626', 3: '#7c3aed' };
 export default function ProgressScreen() {
   const { getWeights, getXP } = useStorage();
   const { dailyLogs } = useData();
+  const plan = usePlan();
   const today = new Date();
-  const currentWeek = getCurrentWeek(today);
+  const currentWeek = getCurrentWeek(today, plan);
   const weights = getWeights();
   const xp = getXP();
   const [expandedWeek, setExpandedWeek] = useState(null);
 
   // Build chart data
-  const chartData = WEEKLY_TARGETS.map(wt => {
+  const chartData = plan.weekly_targets.map(wt => {
     const weekWeights = getWeightsForWeek(wt.week, weights);
     const lowest = weekWeights.length > 0
       ? parseFloat(Math.min(...weekWeights).toFixed(1))
@@ -33,7 +34,7 @@ export default function ProgressScreen() {
   });
 
   // Add start point
-  const fullChartData = [{ name: 'Start', target: START_WEIGHT, actual: START_WEIGHT, week: 0 }, ...chartData];
+  const fullChartData = [{ name: 'Start', target: plan.start_weight, actual: plan.start_weight, week: 0 }, ...chartData];
 
   return (
     <div className="pb-4 animate-fade-in">
@@ -73,8 +74,8 @@ export default function ProgressScreen() {
 
       {/* Week grid */}
       <div className="space-y-2 mb-4">
-        {WEEKLY_TARGETS.map(wt => {
-          const { start, end } = getWeekDateRange(wt.week);
+        {plan.weekly_targets.map(wt => {
+          const { start, end } = getWeekDateRange(wt.week, plan);
           const weekWeights = getWeightsForWeek(wt.week, weights);
           const lowest = weekWeights.length > 0
             ? Math.min(...weekWeights).toFixed(1)
@@ -82,7 +83,7 @@ export default function ProgressScreen() {
           const hitTarget = lowest !== null && parseFloat(lowest) <= wt.target;
           const isCurrent = wt.week === currentWeek;
           const isFuture = wt.week > currentWeek;
-          const phaseConfig = PHASE_CONFIG[wt.phase];
+          const phaseConfig = plan.phase_config[wt.phase];
           const isExpanded = expandedWeek === wt.week;
 
           return (
@@ -132,7 +133,7 @@ export default function ProgressScreen() {
                     dayDate.setDate(dayDate.getDate() + i);
                     const dateKey = toDateKey(dayDate);
                     const dayLog = dailyLogs[dateKey];
-                    const workout = dayLog?.workout || getTrainingForDay(dayDate);
+                    const workout = dayLog?.workout || getTrainingForDay(dayDate, plan);
                     const dayWeight = dayLog?.weight;
                     const isFutureDay = dayDate > today;
                     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -161,7 +162,7 @@ export default function ProgressScreen() {
       </div>
 
       {/* Calorie Bar Chart */}
-      <CalorieChart dailyLogs={dailyLogs} />
+      <CalorieChart dailyLogs={dailyLogs} plan={plan} />
 
       {/* Total XP */}
       <div className="bg-[#1a1a1a] rounded-xl p-4 text-center">
@@ -172,12 +173,12 @@ export default function ProgressScreen() {
   );
 }
 
-function CalorieChart({ dailyLogs }) {
+function CalorieChart({ dailyLogs, plan }) {
   const data = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
     const result = [];
-    const d = new Date(START_DATE);
+    const d = new Date(plan.start_date);
 
     while (d <= today) {
       const dateKey = toDateKey(d);
@@ -210,7 +211,7 @@ function CalorieChart({ dailyLogs }) {
       d.setDate(d.getDate() + 1);
     }
     return result;
-  }, [dailyLogs]);
+  }, [dailyLogs, plan.start_date]);
 
   if (data.length === 0) return null;
 

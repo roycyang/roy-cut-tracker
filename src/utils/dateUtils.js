@@ -14,53 +14,66 @@ export function daysBetween(a, b) {
   return Math.floor((new Date(b) - new Date(a)) / msPerDay);
 }
 
-export function getCurrentWeek(date = getToday()) {
-  const days = daysBetween(START_DATE, date);
+export function getCurrentWeek(date = getToday(), plan = null) {
+  const startDate = plan?.start_date ?? START_DATE;
+  const totalWeeks = plan?.total_weeks ?? WEEKLY_TARGETS.length;
+  const days = daysBetween(startDate, date);
   if (days < 0) return 1;
   const week = Math.floor(days / 7) + 1;
-  return Math.min(week, 10);
+  return Math.min(week, totalWeeks);
 }
 
-export function getCurrentPhase(date = getToday(), override = null) {
+export function getCurrentPhase(date = getToday(), override = null, plan = null) {
   if (override) return override;
-  const week = getCurrentWeek(date);
+  const week = getCurrentWeek(date, plan);
+  const targets = plan?.weekly_targets ?? WEEKLY_TARGETS;
+  const target = targets.find(t => t.week === week);
+  if (target) return target.phase;
+  // Fallback: derive from week position
   if (week <= 6) return 1;
   if (week === 7) return 2;
   return 3;
 }
 
-export function getWeekDateRange(weekNum) {
-  const start = new Date(START_DATE);
+export function getWeekDateRange(weekNum, plan = null) {
+  const startDate = plan?.start_date ?? START_DATE;
+  const start = new Date(startDate);
   start.setDate(start.getDate() + (weekNum - 1) * 7);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   return { start, end };
 }
 
-export function getTrainingForDay(date = getToday()) {
-  const week = getCurrentWeek(date);
+export function getTrainingForDay(date = getToday(), plan = null) {
+  const week = getCurrentWeek(date, plan);
   const day = date.getDay();
-  if (week <= 6) return TRAINING_WEEKS_1_6[day];
-  return TRAINING_WEEKS_7_10[day];
+  const early = plan?.training_weeks_1_6 ?? TRAINING_WEEKS_1_6;
+  const late = plan?.training_weeks_7_10 ?? TRAINING_WEEKS_7_10;
+  if (week <= 6) return early[day];
+  return late[day];
 }
 
-export function getWeekTarget(weekNum) {
-  return WEEKLY_TARGETS.find(w => w.week === weekNum);
+export function getWeekTarget(weekNum, plan = null) {
+  const targets = plan?.weekly_targets ?? WEEKLY_TARGETS;
+  return targets.find(w => w.week === weekNum);
 }
 
-export function isWaterCutPeriod(date = getToday()) {
-  const waterCutStart = new Date(2026, 4, 4); // May 4
-  const waterCutEnd = new Date(2026, 4, 10);   // May 10
-  return date >= waterCutStart && date <= waterCutEnd;
+export function isWaterCutPeriod(date = getToday(), plan = null) {
+  const endDate = plan?.end_date ?? new Date(2026, 4, 10);
+  const waterCutStart = new Date(endDate);
+  waterCutStart.setDate(waterCutStart.getDate() - 6);
+  return date >= waterCutStart && date <= endDate;
 }
 
-export function isFinalWeek(date = getToday()) {
-  const finalWeekStart = new Date(2026, 4, 4); // May 4
+export function isFinalWeek(date = getToday(), plan = null) {
+  const endDate = plan?.end_date ?? new Date(2026, 4, 10);
+  const finalWeekStart = new Date(endDate);
+  finalWeekStart.setDate(finalWeekStart.getDate() - 6);
   return date >= finalWeekStart;
 }
 
-export function isTrainingDay(date = getToday()) {
-  const training = getTrainingForDay(date);
+export function isTrainingDay(date = getToday(), plan = null) {
+  const training = getTrainingForDay(date, plan);
   return training.type !== 'Rest';
 }
 

@@ -7,4 +7,7 @@ export default defineConfig({
   define: {
     __BUILD_ID__: JSON.stringify(Date.now().toString()),
   },
+  test: {
+    environment: 'jsdom',
+  },
 })

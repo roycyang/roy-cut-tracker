@@ -1,16 +1,20 @@
 import { useCallback } from 'react';
-import { XP_VALUES } from '../data/config';
+import { useOutletContext } from 'react-router-dom';
+import { usePlan } from '../context/UserPlanContext';
 import { toDateKey, getCurrentPhase, getCurrentWeek } from '../utils/dateUtils';
 import { useStorage } from '../hooks/useStorage';
 import { computeStreaks, getStreakClass } from '../utils/streaks';
 import { checkBadges } from '../utils/badges';
+import SupplementRecommendations from '../components/SupplementRecommendations';
 
-export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
+export default function SupplementsScreen() {
+  const { showToast: onToast, handleBadgeUnlock: onBadgeUnlock } = useOutletContext();
   const storage = useStorage();
+  const plan = usePlan();
   const today = new Date();
   const dateKey = toDateKey(today);
-  const phase = getCurrentPhase(today, storage.getPhaseOverride());
-  const week = getCurrentWeek(today);
+  const phase = getCurrentPhase(today, storage.getPhaseOverride(), plan);
+  const week = getCurrentWeek(today, plan);
   const isBarrysDay = phase >= 2 && today.getDay() === 3;
 
   const barrysAttendance = storage.getBarrysAttendance();
@@ -20,11 +24,11 @@ export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
 
   const handleBarrysCheck = useCallback(() => {
     storage.setBarrysAttended(dateKey);
-    storage.addXP(XP_VALUES.barrysSession);
-    onToast("Barry's session completed! 🥊 +50 XP");
+    storage.addXP(plan.xp_values.barrysSession);
+    onToast(`Barry's session completed! 🥊 +${plan.xp_values.barrysSession} XP`);
     const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
-  }, [dateKey, onToast, onBadgeUnlock, storage]);
+  }, [dateKey, onToast, onBadgeUnlock, storage, plan.xp_values]);
 
   return (
     <div className="pb-4 animate-fade-in">
@@ -72,7 +76,7 @@ export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
 
       {/* Barry's section (Weeks 7-10) */}
       {week >= 7 && (
-        <div className="bg-[#1a1a1a] rounded-xl p-4">
+        <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">🥊 Barry's Streak</h3>
             <span className="text-2xl font-bold text-orange-400">{barrysCount}/4</span>
@@ -97,6 +101,9 @@ export default function SupplementsScreen({ onToast, onBadgeUnlock }) {
           )}
         </div>
       )}
+
+      {/* Supplement Recommendations with affiliate links */}
+      <SupplementRecommendations />
     </div>
   );
 }

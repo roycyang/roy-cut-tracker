@@ -1,8 +1,13 @@
 import { useState } from 'react';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
+import { useAuth } from '../context/AuthContext';
 
-export default function SettingsScreen({ onSoundToggle, onThemeToggle }) {
+export default function SettingsScreen() {
+  const { handleSoundToggle: onSoundToggle, handleThemeToggle: onThemeToggle } = useOutletContext();
+  const navigate = useNavigate();
   const storage = useStorage();
+  const { user, profile, signOut } = useAuth();
 
   const [sound, setSound] = useState(storage.isSoundEnabled());
   const [theme, setThemeState] = useState(storage.getTheme());
@@ -56,9 +61,55 @@ export default function SettingsScreen({ onSoundToggle, onThemeToggle }) {
     storage.resetAllData();
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch {
+      // If signOut fails, just reload
+      window.location.reload();
+    }
+  };
+
   return (
     <div className="pb-4 animate-fade-in">
       <h2 className="text-lg font-bold mb-4">Settings</h2>
+
+      {/* Profile section */}
+      {user && profile && (
+        <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[#333] flex items-center justify-center text-xl">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+            ) : (
+              profile.display_name?.[0]?.toUpperCase() || '?'
+            )}
+          </div>
+          <div className="flex-1">
+            <div className="font-semibold text-sm">{profile.display_name}</div>
+            <div className="text-xs text-gray-500">{user.email}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick nav links */}
+      <div className="space-y-1 mb-4">
+        {[
+          { path: '/badges', label: 'Badges', icon: '\u{1F3C5}' },
+          { path: '/supplements', label: 'Supplements & Streaks', icon: '\u{1F48A}' },
+          { path: '/photos', label: 'Progress Photos', icon: '\u{1F4F8}' },
+        ].map(link => (
+          <button
+            key={link.path}
+            onClick={() => navigate(link.path)}
+            className="w-full bg-[#1a1a1a] rounded-xl p-4 flex items-center gap-3 text-left active:bg-[#222]"
+          >
+            <span className="text-lg">{link.icon}</span>
+            <span className="font-medium text-sm flex-1">{link.label}</span>
+            <span className="text-gray-600">{'\u203A'}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Goal Weight */}
       <div className="bg-[#1a1a1a] rounded-xl p-4 mb-3">
@@ -77,7 +128,7 @@ export default function SettingsScreen({ onSoundToggle, onThemeToggle }) {
             </div>
           ) : (
             <button onClick={() => setEditingGoal(true)} className="text-sm text-gray-400">
-              {goalWeight} lbs →
+              {goalWeight} lbs {'\u203A'}
             </button>
           )}
         </div>
@@ -151,8 +202,34 @@ export default function SettingsScreen({ onSoundToggle, onThemeToggle }) {
         onClick={handleExport}
         className="w-full bg-[#1a1a1a] rounded-xl p-4 mb-3 text-left font-medium text-sm text-blue-400"
       >
-        Export Weight Log (CSV) →
+        Export Weight Log (CSV) {'\u203A'}
       </button>
+
+      {/* Legal */}
+      <div className="space-y-1 mb-3">
+        {[
+          { path: '/privacy', label: 'Privacy Policy' },
+          { path: '/terms', label: 'Terms of Use' },
+        ].map(link => (
+          <button
+            key={link.path}
+            onClick={() => navigate(link.path)}
+            className="w-full bg-[#1a1a1a] rounded-xl p-4 text-left font-medium text-sm text-gray-400 active:bg-[#222]"
+          >
+            {link.label} {'\u203A'}
+          </button>
+        ))}
+      </div>
+
+      {/* Sign Out */}
+      {user && (
+        <button
+          onClick={handleSignOut}
+          className="w-full bg-[#1a1a1a] rounded-xl p-4 mb-3 text-left font-medium text-sm text-orange-400"
+        >
+          Sign Out
+        </button>
+      )}
 
       {/* Reset */}
       {!showReset ? (

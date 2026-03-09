@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useOutletContext } from 'react-router-dom';
 import confetti from 'canvas-confetti';
-import { PHASE_CONFIG, MOTIVATION, XP_VALUES, START_WEIGHT, START_DATE } from '../data/config';
+import { usePlan } from '../context/UserPlanContext';
 import { getMealsForDay } from '../data/meals';
 import {
   getCurrentWeek, getCurrentPhase, getTrainingForDay, toDateKey,
@@ -14,6 +15,7 @@ import { playMealCheck, playAllMealsDone, playWeeklyTargetHit } from '../utils/s
 import WeightModal from '../components/WeightModal';
 import MealEditModal from '../components/MealEditModal';
 import AddSnackModal from '../components/AddSnackModal';
+import { hapticsSuccess, hapticsLight, hapticsHeavy } from '../utils/haptics';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -42,8 +44,10 @@ function CheckBox({ checked, onChange }) {
   );
 }
 
-export default function TodayScreen({ onToast, onBadgeUnlock }) {
+export default function TodayScreen() {
+  const { showToast: onToast, handleBadgeUnlock: onBadgeUnlock } = useOutletContext();
   const storage = useStorage();
+  const plan = usePlan();
   const [dateOffset, setDateOffset] = useState(0);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showWorkoutPicker, setShowWorkoutPicker] = useState(false);
@@ -59,12 +63,12 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
 
   const isToday = dateOffset === 0;
   const dateKey = toDateKey(viewDate);
-  const week = getCurrentWeek(viewDate);
+  const week = getCurrentWeek(viewDate, plan);
   const phaseOverride = storage.getPhaseOverride();
-  const phase = getCurrentPhase(viewDate, phaseOverride);
-  const training = getTrainingForDay(viewDate);
-  const weekTarget = getWeekTarget(week);
-  const phaseConfig = PHASE_CONFIG[phase];
+  const phase = getCurrentPhase(viewDate, phaseOverride, plan);
+  const training = getTrainingForDay(viewDate, plan);
+  const weekTarget = getWeekTarget(week, plan);
+  const phaseConfig = plan.phase_config[phase];
 
   // Read directly from context — no local state mirroring needed
   const weightLogged = storage.getWeightForDate(dateKey);
@@ -87,10 +91,10 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const minOffset = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(START_DATE);
+    const start = new Date(plan.start_date);
     start.setHours(0, 0, 0, 0);
     return Math.floor((start - today) / (1000 * 60 * 60 * 24));
-  }, []);
+  }, [plan.start_date]);
   const canGoPrev = dateOffset > minOffset;
   const canGoNext = dateOffset < 7;
 
@@ -115,29 +119,35 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const { meals, isBarrysDay, barrysNote } = getMealsForDay(viewDate, phase);
 
   const dayOfYear = Math.floor((viewDate - new Date(viewDate.getFullYear(), 0, 0)) / 86400000);
-  const motivationList = isFinalWeek(viewDate) ? MOTIVATION.final : MOTIVATION[phase];
+  const motivationList = isFinalWeek(viewDate, plan) ? plan.motivation.final : plan.motivation[phase];
   const motivation = motivationList[dayOfYear % motivationList.length];
+
+  const xpValues = plan.xp_values;
+  const goalWeight = (plan.goal_weight_min + plan.goal_weight_max) / 2;
 
   const handleLogWeight = useCallback((weight) => {
     storage.logWeight(dateKey, weight);
-    if (isToday) storage.addXP(XP_VALUES.logWeight);
+    if (isToday) storage.addXP(xpValues.logWeight);
+    hapticsLight();
     setShowWeightModal(false);
 
     if (weekTarget && weight <= weekTarget.target) {
-      const lostTotal = (START_WEIGHT - weight).toFixed(1);
-      const toGo = (weight - 137.5).toFixed(1);
+      const lostTotal = (plan.start_weight - weight).toFixed(1);
+      const toGo = (weight - goalWeight).toFixed(1);
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
       playWeeklyTargetHit();
-      if (isToday) storage.addXP(XP_VALUES.weeklyTarget);
+      hapticsSuccess();
+      if (isToday) storage.addXP(xpValues.weeklyTarget);
       onToast(`Week ${week} target crushed! 🎯 ${lostTotal} lbs down, ${toGo} to go`);
     }
 
-    if (weight <= 137.5) {
+    if (weight <= goalWeight) {
       setTimeout(() => {
-        const totalLost = (START_WEIGHT - weight).toFixed(1);
+        const totalLost = (plan.start_weight - weight).toFixed(1);
         for (let i = 0; i < 5; i++) {
           setTimeout(() => confetti({ particleCount: 100, spread: 120, origin: { y: 0.5 } }), i * 500);
         }
+        hapticsHeavy();
         onToast(`YOU DID IT. 🏆 ${totalLost} lbs lost!`);
       }, 1500);
     }
@@ -145,19 +155,20 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
     const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
     computeStreaks(storage);
-  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday, storage]);
+  }, [dateKey, week, weekTarget, onToast, onBadgeUnlock, isToday, storage, xpValues, plan.start_weight, goalWeight]);
 
   const handleCheck = useCallback((id, checked) => {
     storage.setMealCheck(dateKey, id, checked);
+    if (checked) hapticsLight();
 
     if (checked) {
-      storage.addXP(XP_VALUES.checkMeal);
+      storage.addXP(xpValues.checkMeal);
       const updated = { ...mealChecks, [id]: checked };
       const allMealsDone = updated.meal1 && updated.meal2 && updated.meal3;
       if (allMealsDone) {
-        storage.addXP(XP_VALUES.allMeals);
+        storage.addXP(xpValues.allMeals);
         playAllMealsDone();
-        onToast('All meals logged! 🍽️ +25 XP bonus');
+        onToast(`All meals logged! 🍽️ +${xpValues.allMeals} XP bonus`);
       } else {
         playMealCheck();
       }
@@ -166,7 +177,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
     const newBadges = checkBadges(storage);
     if (newBadges.length > 0) onBadgeUnlock(newBadges[0]);
     computeStreaks(storage);
-  }, [dateKey, mealChecks, onToast, onBadgeUnlock, storage]);
+  }, [dateKey, mealChecks, onToast, onBadgeUnlock, storage, xpValues]);
 
   const handleMealOverrideSave = useCallback((mealId, overrideData) => {
     storage.setMealOverride(dateKey, mealId, overrideData);
@@ -188,16 +199,8 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
   const checkedMeals = resolvedMeals.filter(m => mealChecks[m.id]);
   const extraCal = extraMeals.reduce((s, m) => s + m.cal, 0);
   const extraProtein = extraMeals.reduce((s, m) => s + m.protein, 0);
-  const extraCarbs = extraMeals.reduce((s, m) => s + (m.carbs || 0), 0);
-  const extraFat = extraMeals.reduce((s, m) => s + (m.fat || 0), 0);
   const totalCal = checkedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
   const totalProtein = checkedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
-  const totalCarbs = checkedMeals.reduce((s, m) => s + (m.carbs || 0), 0) + extraCarbs;
-  const totalFat = checkedMeals.reduce((s, m) => s + (m.fat || 0), 0) + extraFat;
-  const allCal = resolvedMeals.reduce((s, m) => s + m.cal, 0) + extraCal;
-  const allProtein = resolvedMeals.reduce((s, m) => s + m.protein, 0) + extraProtein;
-  const carbsTarget = meals.reduce((s, m) => s + (m.carbs || 0), 0);
-  const fatTarget = meals.reduce((s, m) => s + (m.fat || 0), 0);
 
   // Parse phase targets for progress bars
   const calNums = phaseConfig.calRange.replace(/,/g, '').match(/\d+/g)?.map(Number) || [1500, 1650];
@@ -252,7 +255,7 @@ export default function TodayScreen({ onToast, onBadgeUnlock }) {
       <p className="text-gray-400 text-sm italic mb-4">"{motivation}"</p>
 
       {/* Banners */}
-      {isWaterCutPeriod(viewDate) && (
+      {isWaterCutPeriod(viewDate, plan) && (
         <div className="bg-purple-900/30 border border-purple-700/50 rounded-xl px-4 py-3 mb-3 text-sm">
           🧂 Water cut active — no added sodium, 1 gallon water/day
         </div>

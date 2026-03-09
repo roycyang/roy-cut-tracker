@@ -1,15 +1,16 @@
-import { BADGES } from '../data/config';
+import { usePlan } from '../context/UserPlanContext';
 import { useStorage } from '../hooks/useStorage';
 
 export default function BadgesScreen() {
   const { getBadges } = useStorage();
+  const plan = usePlan();
   const unlockedBadges = getBadges();
 
   return (
     <div className="pb-4 animate-fade-in">
       <h2 className="text-lg font-bold mb-4">Badges</h2>
       <div className="grid grid-cols-3 gap-3">
-        {BADGES.map(badge => {
+        {plan.badges.map(badge => {
           const unlocked = unlockedBadges[badge.id];
           const unlockedDate = unlocked
             ? new Date(unlocked.unlockedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

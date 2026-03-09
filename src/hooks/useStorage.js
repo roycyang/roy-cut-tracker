@@ -178,14 +178,26 @@ export function useStorage() {
   }, [getWeights]);
 
   const resetAllData = useCallback(async () => {
-    localStorage.removeItem('sb_daily_logs');
-    localStorage.removeItem('sb_user_state');
-    // Clear old localStorage keys too
-    ['cut_weights', 'cut_meals', 'cut_supplements', 'cut_streaks', 'cut_badges',
-     'cut_xp', 'soundEnabled', 'cut_phaseOverride', 'cut_goalWeight', 'cut_barrys',
-     'cut_phaseTransitions', 'cut_workouts', 'cut_mealOverrides'].forEach(k => localStorage.removeItem(k));
-    await supabase.from('daily_logs').delete().neq('date_key', '');
-    await supabase.from('user_state').delete().eq('id', 'roy');
+    // Clear all possible localStorage cache keys
+    const keysToRemove = ['sb_daily_logs', 'sb_user_state',
+      'cut_weights', 'cut_meals', 'cut_supplements', 'cut_streaks', 'cut_badges',
+      'cut_xp', 'soundEnabled', 'cut_phaseOverride', 'cut_goalWeight', 'cut_barrys',
+      'cut_phaseTransitions', 'cut_workouts', 'cut_mealOverrides'];
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Also clear user-namespaced keys
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id;
+    if (uid) {
+      localStorage.removeItem(`sb_${uid}_daily_logs`);
+      localStorage.removeItem(`sb_${uid}_user_state`);
+      await supabase.from('daily_logs').delete().eq('user_id', uid);
+      await supabase.from('user_state_v2').delete().eq('user_id', uid);
+    } else {
+      // Legacy mode
+      await supabase.from('daily_logs').delete().neq('date_key', '');
+      await supabase.from('user_state').delete().eq('id', 'roy');
+    }
     window.location.reload();
   }, []);
 
