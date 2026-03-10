@@ -49,7 +49,7 @@ export default function OnboardingScreen() {
     cutting_for_detail: '',
     current_weight: '',
     goal_weight: '',
-    weeks: '10',
+    weeks: '',
     exercise: null,
     dietary: '',
     privacy_mode: 'social',
@@ -223,38 +223,62 @@ export default function OnboardingScreen() {
         )}
 
         {/* Timeframe */}
-        {currentStep === 'timeframe' && (
+        {currentStep === 'timeframe' && (() => {
+          const delta = parseFloat(answers.current_weight) - parseFloat(answers.goal_weight);
+          const minWeeks = Math.max(4, Math.ceil(delta / 2)); // aggressive: 2 lbs/week
+          const maxWeeks = Math.max(minWeeks + 2, Math.ceil(delta / 1)); // conservative: 1 lb/week
+          const midLow = Math.round(minWeeks + (maxWeeks - minWeeks) * 0.33);
+          const midHigh = Math.round(minWeeks + (maxWeeks - minWeeks) * 0.66);
+          // Deduplicate and sort
+          const options = [...new Set([minWeeks, midLow, midHigh, maxWeeks])].sort((a, b) => a - b);
+          const recommendedWeek = String(midLow);
+          // Auto-select recommended if current selection is out of range
+          if (!options.map(String).includes(answers.weeks)) {
+            update('weeks', recommendedWeek);
+          }
+          return (
           <div className="animate-fade-in">
             <h2 className="text-lg font-bold mb-1">How many weeks?</h2>
             <p className="text-gray-500 text-sm mb-4">
               We recommend 1-2 lbs/week for safe, sustainable loss.
-              {answers.current_weight && answers.goal_weight && (
+              {delta > 0 && (
                 <span className="block mt-1 text-blue-400">
-                  That's {(parseFloat(answers.current_weight) - parseFloat(answers.goal_weight)).toFixed(1)} lbs to lose.
+                  That's {delta.toFixed(1)} lbs to lose.
                 </span>
               )}
             </p>
             <div className="flex gap-2 mb-4">
-              {['6', '8', '10', '12'].map(w => (
+              {options.map(w => {
+                const ws = String(w);
+                const isRecommended = ws === recommendedWeek;
+                return (
                 <button
                   key={w}
-                  onClick={() => update('weeks', w)}
-                  className={`flex-1 py-3 rounded-xl font-bold text-lg transition-all ${
-                    answers.weeks === w
+                  onClick={() => update('weeks', ws)}
+                  className={`flex-1 py-3 rounded-xl font-bold text-lg transition-all relative ${
+                    answers.weeks === ws
                       ? 'bg-blue-600 text-white'
                       : 'bg-[#1a1a1a] text-gray-400'
                   }`}
                 >
                   {w}
+                  {isRecommended && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] bg-green-600 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap">rec</span>
+                  )}
                 </button>
-              ))}
+                );
+              })}
             </div>
+            <p className="text-gray-600 text-xs mb-4 text-center">
+              {options[0]} wks = ~{(delta / options[0]).toFixed(1)} lbs/wk (aggressive) · {options[options.length - 1]} wks = ~{(delta / options[options.length - 1]).toFixed(1)} lbs/wk (steady)
+            </p>
             <div className="flex gap-3">
               <button onClick={back} className="flex-1 py-3 bg-[#1a1a1a] rounded-xl text-gray-400 font-medium">Back</button>
               <button onClick={next} className="flex-1 py-3 bg-blue-600 rounded-xl font-semibold text-white">Next</button>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Exercise */}
         {currentStep === 'exercise' && (
