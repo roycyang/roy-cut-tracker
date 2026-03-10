@@ -17,11 +17,31 @@ const CUTTING_FOR_OPTIONS = [
 ];
 
 const EXERCISE_OPTIONS = [
-  { id: 'gym', label: 'Gym / Weight training' },
-  { id: 'classes', label: 'Fitness classes (Barry\'s, Solidcore, etc.)' },
+  { id: 'weights', label: 'Weight training', emoji: '\u{1F3CB}\uFE0F' },
+  { id: 'running', label: 'Running / Jogging', emoji: '\u{1F3C3}' },
+  { id: 'hiit', label: 'HIIT / CrossFit', emoji: '\u{1F525}' },
+  { id: 'classes', label: 'Group classes', sub: "Barry's, Solidcore, OTF...", emoji: '\u{1F4AA}' },
+  { id: 'yoga', label: 'Yoga / Pilates', emoji: '\u{1F9D8}' },
+  { id: 'cycling', label: 'Cycling / Spinning', emoji: '\u{1F6B4}' },
+  { id: 'walking', label: 'Walking', emoji: '\u{1F6B6}' },
+  { id: 'swimming', label: 'Swimming', emoji: '\u{1F3CA}' },
+];
+
+const MORE_EXERCISE_OPTIONS = [
+  { id: 'martial_arts', label: 'Martial arts / Boxing' },
+  { id: 'dance', label: 'Dance' },
+  { id: 'climbing', label: 'Rock climbing' },
+  { id: 'rowing', label: 'Rowing' },
+  { id: 'tennis', label: 'Tennis / Racquet sports' },
+  { id: 'hiking', label: 'Hiking' },
   { id: 'home', label: 'Home workouts' },
-  { id: 'running', label: 'Running / Cardio' },
-  { id: 'mixed', label: 'Mix of everything' },
+  { id: 'sports', label: 'Team sports' },
+  { id: 'calisthenics', label: 'Calisthenics / Bodyweight' },
+  { id: 'stairmaster', label: 'Stair climber / Elliptical' },
+  { id: 'skiing', label: 'Skiing / Snowboarding' },
+  { id: 'surfing', label: 'Surfing' },
+  { id: 'golf', label: 'Golf' },
+  { id: 'jump_rope', label: 'Jump rope' },
 ];
 
 const STEPS = [
@@ -50,7 +70,7 @@ export default function OnboardingScreen() {
     current_weight: '',
     goal_weight: '',
     weeks: '',
-    exercise: null,
+    exercise: [],
     dietary: '',
     privacy_mode: 'social',
     share_photos_mode: 'blur',
@@ -58,6 +78,8 @@ export default function OnboardingScreen() {
   });
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [exerciseShowMore, setExerciseShowMore] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState('');
   const chatEndRef = useRef(null);
 
   const currentStep = STEPS[step];
@@ -281,28 +303,109 @@ export default function OnboardingScreen() {
         })()}
 
         {/* Exercise */}
-        {currentStep === 'exercise' && (
+        {currentStep === 'exercise' && (() => {
+          const selected = answers.exercise || [];
+          const toggle = (id) => {
+            const next = selected.includes(id)
+              ? selected.filter(x => x !== id)
+              : [...selected, id];
+            update('exercise', next);
+          };
+          const [showMore, setShowMore] = [exerciseShowMore, setExerciseShowMore];
+          const [search, setSearch] = [exerciseSearch, setExerciseSearch];
+          const filteredMore = MORE_EXERCISE_OPTIONS.filter(opt =>
+            opt.label.toLowerCase().includes(search.toLowerCase()) && !selected.includes(opt.id)
+          );
+          return (
           <div className="animate-fade-in">
             <h2 className="text-lg font-bold mb-1">How do you like to train?</h2>
-            <p className="text-gray-500 text-sm mb-4">We'll build your training schedule around this.</p>
-            <div className="space-y-2 mb-4">
-              {EXERCISE_OPTIONS.map(opt => (
+            <p className="text-gray-500 text-sm mb-4">Pick all that apply. We'll build your schedule around these.</p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {EXERCISE_OPTIONS.map(opt => {
+                const isSelected = selected.includes(opt.id);
+                return (
                 <button
                   key={opt.id}
-                  onClick={() => { update('exercise', opt.id); next(); }}
-                  className={`w-full p-3 rounded-xl text-left text-sm transition-all ${
-                    answers.exercise === opt.id
+                  onClick={() => toggle(opt.id)}
+                  className={`p-3 rounded-xl text-left text-sm transition-all ${
+                    isSelected
                       ? 'bg-blue-600/20 border border-blue-500'
                       : 'bg-[#1a1a1a] border border-transparent active:border-[#444]'
                   }`}
                 >
-                  {opt.label}
+                  <span className="text-lg mr-1.5">{opt.emoji}</span>
+                  <span className="font-medium">{opt.label}</span>
+                  {opt.sub && <span className="block text-[10px] text-gray-500 mt-0.5 ml-7">{opt.sub}</span>}
                 </button>
-              ))}
+                );
+              })}
             </div>
-            <button onClick={back} className="w-full py-3 bg-[#1a1a1a] rounded-xl text-gray-400 font-medium">Back</button>
+
+            {/* Show more / search */}
+            {!showMore ? (
+              <button
+                onClick={() => setShowMore(true)}
+                className="w-full py-2 text-sm text-blue-400 mb-3"
+              >
+                + More activities...
+              </button>
+            ) : (
+              <div className="mb-3">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search activities..."
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 mb-2"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {filteredMore.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => toggle(opt.id)}
+                      className="px-3 py-1.5 rounded-full text-xs bg-[#1a1a1a] border border-[#333] text-gray-300 active:border-blue-500 transition-all"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  {filteredMore.length === 0 && search && (
+                    <p className="text-gray-600 text-xs py-1">No matches</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Selected tags (from "more" list) */}
+            {selected.filter(id => MORE_EXERCISE_OPTIONS.some(o => o.id === id)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {selected.filter(id => MORE_EXERCISE_OPTIONS.some(o => o.id === id)).map(id => {
+                  const opt = MORE_EXERCISE_OPTIONS.find(o => o.id === id);
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => toggle(id)}
+                      className="px-3 py-1.5 rounded-full text-xs bg-blue-600/20 border border-blue-500 text-blue-300"
+                    >
+                      {opt.label} &times;
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={back} className="flex-1 py-3 bg-[#1a1a1a] rounded-xl text-gray-400 font-medium">Back</button>
+              <button
+                onClick={next}
+                disabled={selected.length === 0}
+                className="flex-1 py-3 bg-blue-600 rounded-xl font-semibold text-white disabled:opacity-40"
+              >
+                Next{selected.length > 0 ? ` (${selected.length})` : ''}
+              </button>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Dietary */}
         {currentStep === 'dietary' && (
@@ -402,7 +505,7 @@ export default function OnboardingScreen() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Training</span>
-                <span className="text-white">{EXERCISE_OPTIONS.find(o => o.id === answers.exercise)?.label || '—'}</span>
+                <span className="text-white text-right">{(answers.exercise || []).map(id => [...EXERCISE_OPTIONS, ...MORE_EXERCISE_OPTIONS].find(o => o.id === id)?.label).filter(Boolean).join(', ') || '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Mode</span>
