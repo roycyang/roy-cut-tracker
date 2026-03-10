@@ -53,7 +53,6 @@ const STEPS = [
   'exercise',
   'dietary',
   'privacy',
-  'photos',
   'terms',
   'generating',
 ];
@@ -459,34 +458,7 @@ export default function OnboardingScreen() {
           </div>
         )}
 
-        {/* Photos */}
-        {currentStep === 'photos' && (
-          <div className="animate-fade-in">
-            <h2 className="text-lg font-bold mb-1">Progress photos in feed?</h2>
-            <p className="text-gray-500 text-sm mb-4">If you share photos, how should they appear?</p>
-            <div className="space-y-2 mb-4">
-              {[
-                { id: 'show', label: 'Show as-is', desc: 'Photos visible as you took them' },
-                { id: 'blur', label: 'Blur face', desc: 'Face auto-blurred in the feed (you still see the original)' },
-                { id: 'private', label: 'Keep private', desc: 'Photos never shared, visible only to you' },
-              ].map(opt => (
-                <button
-                  key={opt.id}
-                  onClick={() => { update('share_photos_mode', opt.id); next(); }}
-                  className={`w-full p-4 rounded-xl text-left transition-all ${
-                    answers.share_photos_mode === opt.id
-                      ? 'bg-blue-600/20 border border-blue-500'
-                      : 'bg-[#1a1a1a] border border-transparent'
-                  }`}
-                >
-                  <div className="font-semibold text-sm mb-1">{opt.label}</div>
-                  <div className="text-xs text-gray-400">{opt.desc}</div>
-                </button>
-              ))}
-            </div>
-            <button onClick={back} className="w-full py-3 bg-[#1a1a1a] rounded-xl text-gray-400 font-medium">Back</button>
-          </div>
-        )}
+        {/* Photos step removed — prompt during first use instead */}
 
         {/* Terms */}
         {currentStep === 'terms' && (
